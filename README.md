@@ -8,7 +8,7 @@ go get github.com/radityaapratamaa/rorm
 
 ## Benchmarking vs XORM
 ```
-go test -bench=.
+***go test -bench=.***
 goos: darwin
 goarch: amd64
 pkg: sample_file/test_rorm

@@ -193,6 +193,7 @@ func (re *RormEngine) Get(pointerStruct interface{}) error {
 		if err != nil {
 			return errors.New("Table Name cannot be set")
 		}
+		re.tableName = re.tablePrefix + re.tableName
 	}
 	re.rawQuery += " FROM " + re.tableName
 

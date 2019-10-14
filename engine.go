@@ -38,6 +38,10 @@ func (re *RormEngine) GetDB() *sql.DB {
 	return re.DB
 }
 
+func (re *RormEngine) GetPreparedValues() []interface{} {
+	return re.conditionValue
+}
+
 // InitRormEngine - init new RORM Engine
 func New(dbDriver, connectionURL string, tbPrefix ...string) *RormEngine {
 	re := &RormEngine{}

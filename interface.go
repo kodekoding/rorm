@@ -7,6 +7,7 @@ import "database/sql"
 type EngineInterface interface {
 	SetDB(db *sql.DB)
 	GetDB() *sql.DB
+	GetPreparedValues() []interface{}
 
 	GenerateRawCUDQuery(command string, data interface{})
 

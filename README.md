@@ -1,14 +1,41 @@
 # RORM (Raw Query ORM)
-Raw Query ORM Library
+Raw Query ORM Library for golang (postgres, mysql)
+other RDBMS coming soon
+
+NoSQL query will be coming soon too
 
 ## Installation
 ```go
 go get github.com/radityaapratamaa/rorm
 ```
 
+## Features
+| Read          | CUD    |
+| :------------ | :----- |
+| Select        | Insert |
+| SelectSum     | Update |
+| SelectAverage |        |
+| SelectMax     |        |
+| SelectMin     |        |
+| SelectCount   |        |
+| Where         |        |
+| WhereIn       |        |
+| WhereNotIn    |        |
+| WhereLike     |        |
+| Or            |        |
+| OrIn          |        |
+| OrNotIn       |        |
+| OrLike        |        |
+| GroupBy       |        |
+| Join          |        |
+| Limit         |        |
+| OrderBy       |        |
+| Asc           |        |
+| Desc          |        |
+
 ## Benchmarking vs XORM
-```
-***go test -bench=.***
+**go test -bench=.**
+```bash
 goos: darwin
 goarch: amd64
 pkg: sample_file/test_rorm
@@ -23,3 +50,4 @@ BenchmarkInsertXorm10000-4          1000           2275546 ns/op            2243
 PASS
 ok      sample_file/test_rorm   16.279s
 ```
+

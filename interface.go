@@ -1,8 +1,13 @@
 package rorm
 
+import "database/sql"
+
 // import rormEngine "github.com/radityaapratamaa/rorm/engine"
 
 type EngineInterface interface {
+	SetDB(db *sql.DB)
+	GetDB() *sql.DB
+
 	GenerateRawCUDQuery(command string, data interface{})
 
 	GetLastQuery() string

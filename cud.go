@@ -39,10 +39,10 @@ func (re *RormEngine) generateRawCUDQuery(command string, data interface{}) {
 	}
 	for i := 0; i < refValue.NumField(); i++ {
 		tagField := refValue.Type().Field(i).Tag
-		if strings.Contains(tagField.Get("rorm"), "autoincrement") {
+		if strings.Contains(tagField.Get("json"), "autoincrement") {
 			continue
 		}
-		cols += tagField.Get("rorm") + ","
+		cols += tagField.Get("json") + ","
 		if command == "INSERT" {
 			values += "?,"
 		} else if command == "UPDATE" {

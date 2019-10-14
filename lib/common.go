@@ -2,7 +2,6 @@ package lib
 
 import (
 	"errors"
-	"log"
 	"reflect"
 	"regexp"
 	"strings"
@@ -14,10 +13,8 @@ func GetStructName(pointerStruct interface{}) (string, error) {
 	if reflectVal.Kind() != reflect.Ptr {
 		return "", errors.New("The Struct must be pointer")
 	}
-	if reflectVal.Kind() == reflect.Ptr {
-		reflectVal = reflectVal.Elem()
-	}
-	log.Println(reflectVal.Kind().String())
+	reflectVal = reflectVal.Elem()
+
 	if reflectVal.Kind() == reflect.Struct {
 		// log.Println("nama structnya " + reflectVal.Type().Name())
 		structName = reflectVal.Type().Name()

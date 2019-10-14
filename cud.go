@@ -70,7 +70,7 @@ func (re *RormEngine) GenerateRawCUDQuery(command string, data interface{}) {
 func (re *RormEngine) executeCUDQuery(cmd string) (int64, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	prepared, err := re.DB.PrepareContext(ctx, re.rawQuery)
+	prepared, err := re.db.PrepareContext(ctx, re.rawQuery)
 	if err != nil {
 		return 0, errors.New("Error When Prepare Statement: " + err.Error())
 	}

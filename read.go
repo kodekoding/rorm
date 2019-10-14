@@ -36,19 +36,47 @@ func (re *RormEngine) Select(col ...string) *RormEngine {
 	return re
 }
 
-func (re *RormEngine) SelectSum(col string) *RormEngine {
+func (re *RormEngine) aggregateFuncSelect(command, col string, colAlias ...string) {
 	if re.column != "" {
 		re.column += ","
 	}
-	re.column += "SUM(" + col + ")"
+	re.column += command + "(" + col + ")"
+	if colAlias != nil {
+		re.column += " AS " + colAlias[0]
+	}
+}
+
+func (re *RormEngine) SelectSum(col string, colAlias ...string) *RormEngine {
+	re.aggregateFuncSelect("SUM", col, colAlias...)
 	return re
 }
 
-func (re *RormEngine) SelectAverage(col string) *RormEngine {
-	if re.column != "" {
-		re.column += ","
-	}
-	re.column += "AVG(" + col + ")"
+func (re *RormEngine) SelectAverage(col string, colAlias ...string) *RormEngine {
+	re.aggregateFuncSelect("AVG", col, colAlias...)
+
+	return re
+}
+
+func (re *RormEngine) SelectMax(col string, colAlias ...string) *RormEngine {
+	re.aggregateFuncSelect("MAX", col, colAlias...)
+
+	return re
+}
+
+func (re *RormEngine) SelectMin(col string, colAlias ...string) *RormEngine {
+	re.aggregateFuncSelect("MIN", col, colAlias...)
+
+	return re
+}
+
+func (re *RormEngine) SelectCount(col string, colAlias ...string) *RormEngine {
+	re.aggregateFuncSelect("COUNT", col, colAlias...)
+
+	return re
+}
+
+func (re *RormEngine) Raw(rawQuery string) *RormEngine {
+	re.rawQuery = rawQuery
 	return re
 }
 
@@ -158,11 +186,31 @@ func (re *RormEngine) Or(col, value string, opt ...string) *RormEngine {
 	return re
 }
 
+func (re *RormEngine) Having() {
+	// coming soon
+}
+
 func (re *RormEngine) OrderBy(col, value string) *RormEngine {
 	if re.orderBy != "" {
 		re.orderBy += ", "
 	}
 	re.orderBy += col + " " + value
+	return re
+}
+
+func (re *RormEngine) Asc(col string) *RormEngine {
+	if re.orderBy != "" {
+		re.orderBy += ", "
+	}
+	re.orderBy += col + " ASC"
+	return re
+}
+
+func (re *RormEngine) Desc(col string) *RormEngine {
+	if re.orderBy != "" {
+		re.orderBy += ", "
+	}
+	re.orderBy += col + " DESC"
 	return re
 }
 
@@ -216,7 +264,7 @@ func (re *RormEngine) Get(pointerStruct interface{}) error {
 	}
 	fmt.Println(re.rawQuery)
 	// Set Prepared Raw Query
-	prepared, err := re.DB.Prepare(re.rawQuery)
+	prepared, err := re.db.Prepare(re.rawQuery)
 	if err != nil {
 		re.clearField()
 		return errors.New("Error When Prepared Query: " + err.Error())

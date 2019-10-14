@@ -3,6 +3,8 @@ package rorm
 // import rormEngine "github.com/radityaapratamaa/rorm/engine"
 
 type EngineInterface interface {
+	GenerateRawCUDQuery(command string, data interface{})
+
 	GetLastQuery() string
 	GetResults() []map[string]string
 	GetSingleResult() map[string]string

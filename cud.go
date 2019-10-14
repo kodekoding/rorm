@@ -10,7 +10,7 @@ import (
 	"github.com/radityaapratamaa/rorm/lib"
 )
 
-func (re *RormEngine) generateRawCUDQuery(command string, data interface{}) {
+func (re *RormEngine) GenerateRawCUDQuery(command string, data interface{}) {
 	refValue := reflect.ValueOf(data)
 	tableName := ""
 	re.rawQuery = command
@@ -93,7 +93,7 @@ func (re *RormEngine) Insert(data interface{}) error {
 		return errors.New("Need Parameter to be passed")
 	}
 	command := "INSERT"
-	re.generateRawCUDQuery(command, data)
+	re.GenerateRawCUDQuery(command, data)
 	_, err := re.executeCUDQuery(command)
 
 	return err
@@ -104,7 +104,7 @@ func (re *RormEngine) Update(data interface{}) error {
 		return errors.New("Need Parameter to be passed")
 	}
 	command := "INSERT"
-	re.generateRawCUDQuery(command, data)
+	re.GenerateRawCUDQuery(command, data)
 	_, err := re.executeCUDQuery(command)
 	return err
 }

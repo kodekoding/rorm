@@ -16,8 +16,11 @@ type EngineInterface interface {
 	GetSingleResult() map[string]string
 
 	Select(col ...string) *RormEngine
-	SelectSum(col string) *RormEngine
-	SelectAverage(col string) *RormEngine
+	SelectSum(col string, colAlias ...string) *RormEngine
+	SelectAverage(col string, colAlias ...string) *RormEngine
+	SelectMax(col string, colAlias ...string) *RormEngine
+	SelectMin(col string, colAlias ...string) *RormEngine
+	SelectCount(col string, colAlias ...string) *RormEngine
 
 	Where(col, value string, opt ...string) *RormEngine
 	WhereIn(col string, listOfValues ...interface{}) *RormEngine
@@ -30,9 +33,13 @@ type EngineInterface interface {
 	OrLike(col, value string) *RormEngine
 
 	OrderBy(col, value string) *RormEngine
+	Asc(col string) *RormEngine
+	Desc(col string) *RormEngine
+
 	Limit(limit int, offset ...int) *RormEngine
 	From(tableName string) *RormEngine
 
+	Raw(rawQuery string) *RormEngine
 	Get(pointerStruct interface{}) error
 
 	Insert(data interface{}) error

@@ -1,10 +1,11 @@
 package rorm
 
 import (
+	"context"
 	"errors"
-	"fmt"
 	"reflect"
 	"strings"
+	"time"
 
 	"github.com/radityaapratamaa/rorm/lib"
 )
@@ -66,20 +67,44 @@ func (re *RormEngine) generateRawCUDQuery(command string, data interface{}) {
 	}
 }
 
+func (re *RormEngine) executeCUDQuery(cmd string) (int64, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	prepared, err := re.DB.PrepareContext(ctx, re.rawQuery)
+	if err != nil {
+		return 0, errors.New("Error When Prepare Statement: " + err.Error())
+	}
+	defer prepared.Close()
+
+	exec, err := prepared.ExecContext(ctx, re.conditionValue...)
+	if err != nil {
+		return 0, errors.New("Error When Execute Prepare Statement: " + err.Error())
+	}
+
+	if cmd == "INSERT" {
+		return exec.LastInsertId()
+	}
+
+	return exec.RowsAffected()
+}
+
 func (re *RormEngine) Insert(data interface{}) error {
 	if data == nil {
 		return errors.New("Need Parameter to be passed")
 	}
-	re.generateRawCUDQuery("INSERT", data)
-	fmt.Println(re.rawQuery)
-	return nil
+	command := "INSERT"
+	re.generateRawCUDQuery(command, data)
+	_, err := re.executeCUDQuery(command)
+
+	return err
 }
 
 func (re *RormEngine) Update(data interface{}) error {
 	if data == nil {
 		return errors.New("Need Parameter to be passed")
 	}
-	re.generateRawCUDQuery("UPDATE", data)
-	fmt.Println(re.rawQuery)
-	return nil
+	command := "INSERT"
+	re.generateRawCUDQuery(command, data)
+	_, err := re.executeCUDQuery(command)
+	return err
 }

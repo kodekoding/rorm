@@ -7,22 +7,29 @@ import (
 )
 
 // RormEngine - Raw Query ORM Engine structure
-type RormEngine struct {
-	DB             *sql.DB
-	dbDriver       string
-	result         map[string]string
-	results        []map[string]string
-	conditionValue []interface{}
-	rawQuery       string
-	column         string
-	orderBy        string
-	condition      string
-	tableName      string
-	tablePrefix    string
-	limit          string
-	join           string
-	groupBy        string
-}
+type (
+	RormEngine struct {
+		db       *sql.DB
+		dbDriver string
+		result   map[string]string
+		results  []map[string]string
+		RormOperations
+	}
+
+	RormOperations struct {
+		rawQuery       string
+		column         string
+		orderBy        string
+		condition      string
+		conditionValue []interface{}
+		tableName      string
+		tablePrefix    string
+		limit          string
+		join           string
+		groupBy        string
+		having         string
+	}
+)
 
 const (
 	MYSQL_PREPARED_PARAM    = "?"
@@ -31,11 +38,11 @@ const (
 )
 
 func (re *RormEngine) SetDB(db *sql.DB) {
-	re.DB = db
+	re.db = db
 }
 
 func (re *RormEngine) GetDB() *sql.DB {
-	return re.DB
+	return re.db
 }
 
 func (re *RormEngine) GetPreparedValues() []interface{} {
@@ -52,7 +59,7 @@ func New(dbDriver, connectionURL string, tbPrefix ...string) *RormEngine {
 // Connect - connect to db Driver
 func (re *RormEngine) Connect(dbDriver, connectionURL string, tbPrefix ...string) error {
 	var err error
-	re.DB, err = sql.Open(dbDriver, connectionURL)
+	re.db, err = sql.Open(dbDriver, connectionURL)
 	re.dbDriver = dbDriver
 	if tbPrefix != nil {
 		re.tablePrefix = tbPrefix[0]

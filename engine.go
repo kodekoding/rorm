@@ -30,6 +30,14 @@ const (
 	ORACLE_PREPARED_PARAM   = ":"
 )
 
+func (re *RormEngine) SetDB(db *sql.DB) {
+	re.DB = db
+}
+
+func (re *RormEngine) GetDB() *sql.DB {
+	return re.DB
+}
+
 // InitRormEngine - init new RORM Engine
 func New(dbDriver, connectionURL string, tbPrefix ...string) *RormEngine {
 	re := &RormEngine{}

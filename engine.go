@@ -18,6 +18,7 @@ type RormEngine struct {
 	orderBy        string
 	condition      string
 	tableName      string
+	tablePrefix    string
 	limit          string
 	join           string
 	groupBy        string
@@ -30,15 +31,20 @@ const (
 )
 
 // InitRormEngine - init new RORM Engine
-func InitNewEngine() *RormEngine {
-	return &RormEngine{}
+func New(dbDriver, connectionURL string, tbPrefix ...string) *RormEngine {
+	re := &RormEngine{}
+	re.Connect(dbDriver, connectionURL, tbPrefix...)
+	return re
 }
 
 // Connect - connect to db Driver
-func (re *RormEngine) Connect(dbDriver, connectionURL string) error {
+func (re *RormEngine) Connect(dbDriver, connectionURL string, tbPrefix ...string) error {
 	var err error
 	re.DB, err = sql.Open(dbDriver, connectionURL)
 	re.dbDriver = dbDriver
+	if tbPrefix != nil {
+		re.tablePrefix = tbPrefix[0]
+	}
 	return err
 }
 

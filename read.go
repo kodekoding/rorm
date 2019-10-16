@@ -95,7 +95,7 @@ func (re *Engine) GroupBy(col ...string) *Engine {
 	return re
 }
 
-func (re *Engine) Where(col, value string, opt ...string) *Engine {
+func (re *Engine) Where(col string, value interface{}, opt ...string) *Engine {
 	if opt != nil {
 		re.generateCondition(col, value, opt[0], true)
 	} else {
@@ -159,7 +159,7 @@ func (re *Engine) OrLike(col, value string) *Engine {
 	return re
 }
 
-func (re *Engine) generateCondition(col, value, opt string, isAnd bool) {
+func (re *Engine) generateCondition(col string, nValue interface{}, opt string, isAnd bool) {
 	if re.condition != "" {
 		if !isAnd {
 			re.condition += " OR "
@@ -169,6 +169,22 @@ func (re *Engine) generateCondition(col, value, opt string, isAnd bool) {
 	}
 	re.condition += col + " " + opt + " "
 	// fmt.Println("opt " + opt)
+	iValue := reflect.ValueOf(nValue)
+	value := ""
+	switch iValue.Kind() {
+	case reflect.Int, reflect.Int64, reflect.Int8, reflect.Int16:
+		value = strconv.FormatInt(iValue.Int(), 10)
+	case reflect.String:
+		value = iValue.String()
+	case reflect.Bool:
+		nBool := iValue.Bool()
+		value = "1"
+		if !nBool {
+			value = "0"
+		}
+	default:
+		log.Fatalln("Value is not defined")
+	}
 	if !strings.Contains(opt, "IN") {
 		re.condition += "'" + value + "'"
 	} else {
@@ -176,7 +192,7 @@ func (re *Engine) generateCondition(col, value, opt string, isAnd bool) {
 	}
 }
 
-func (re *Engine) Or(col, value string, opt ...string) *Engine {
+func (re *Engine) Or(col string, value interface{}, opt ...string) *Engine {
 	if opt != nil {
 		re.generateCondition(col, value, opt[0], false)
 	} else {
@@ -224,6 +240,7 @@ func (re *Engine) Limit(limit int, offset ...int) *Engine {
 
 // Get - Execute the Raw Query
 func (re *Engine) Get(pointerStruct interface{}) error {
+	defer re.clearField()
 	var err error
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
@@ -271,7 +288,6 @@ func (re *Engine) Get(pointerStruct interface{}) error {
 	// Set Prepared Raw Query
 	prepared, err := re.db.Prepare(re.rawQuery)
 	if err != nil {
-		re.clearField()
 		return errors.New("Error When Prepared Query: " + err.Error())
 	}
 	defer prepared.Close()
@@ -281,7 +297,6 @@ func (re *Engine) Get(pointerStruct interface{}) error {
 	// Exec Query with Context 2 seconds
 	exec, err := prepared.QueryContext(ctx, re.preparedValue...)
 	if err != nil {
-		re.clearField()
 		return errors.New("Error When Execute Prepared Statement: " + err.Error())
 	}
 	defer exec.Close()
@@ -289,10 +304,8 @@ func (re *Engine) Get(pointerStruct interface{}) error {
 	// Store the result to pointer struct
 	err = re.scanToStruct(exec, pointerStruct)
 	if err != nil {
-		re.clearField()
 		return errors.New("Error When Get Rows: " + err.Error())
 	}
-	re.clearField()
 	return nil
 }
 

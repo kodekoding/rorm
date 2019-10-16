@@ -35,16 +35,19 @@ type (
 	}
 	// Operations - list of property query string
 	Operations struct {
-		rawQuery      string
-		column        string
-		orderBy       string
-		condition     string
-		preparedValue []interface{}
-		tableName     string
-		limit         string
-		join          string
-		groupBy       string
-		having        string
+		isRaw              bool
+		isBulk             bool
+		rawQuery           string
+		column             string
+		orderBy            string
+		condition          string
+		preparedValue      []interface{}
+		multiPreparedValue [][]interface{}
+		tableName          string
+		limit              string
+		join               string
+		groupBy            string
+		having             string
 	}
 )
 

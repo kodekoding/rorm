@@ -2,6 +2,7 @@ package rorm
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"reflect"
 	"strings"
@@ -10,62 +11,52 @@ import (
 	"github.com/radityaapratamaa/rorm/lib"
 )
 
-func (re *Engine) GenerateRawCUDQuery(command string, data interface{}) {
-	refValue := reflect.ValueOf(data)
-	tableName := ""
-	re.rawQuery = command
-	// cols := ""
-	// values := ""
-	switch refValue.Kind() {
-	case reflect.Struct:
-		tableName = refValue.Type().Name()
-	case reflect.Ptr:
-		tableName = refValue.Type().Elem().Name()
-		refValue = refValue.Elem()
+func (re *Engine) Insert(data interface{}) error {
+	dVal := reflect.ValueOf(data)
+	if data == nil || (dVal.Kind() != reflect.Ptr) {
+		return errors.New("parameter cannot be nil and must be a pointer")
 	}
+	command := "INSERT"
+	if dVal.Elem().Kind() == reflect.Slice {
+		re.isBulk = true
+	}
+	// set column and preparedValue for executing data
+	re.preparedData(command, data)
+	re.GenerateRawCUDQuery(command, data)
+	_, err := re.executeCUDQuery(command)
 
-	// Change Table Name Camel Case to Snake Case
-	tableName = re.options.tbPrefix + tableName + re.options.tbPostfix
+	return err
+}
+
+func (re *Engine) Update(data interface{}) error {
+	dVal := reflect.ValueOf(data)
+	if data == nil || (dVal.Kind() != reflect.Ptr) || (dVal.Kind() == reflect.Slice) {
+		return errors.New("parameter cannot be nil, must be a pointer, and not slice")
+	}
+	command := "UPDATE"
+	re.preparedData(command, data)
+	re.GenerateRawCUDQuery(command, data)
+	_, err := re.executeCUDQuery(command)
+	return err
+}
+func (re *Engine) GenerateRawCUDQuery(command string, data interface{}) {
+	re.rawQuery = command
+
+	re.tableName = re.options.tbPrefix + re.tableName + re.options.tbPostfix
+	// Adjustment Table Name to Case Format (if available)
 	switch re.options.tbFormat {
 	case "camel":
-		tableName = lib.SnakeToCamelCase(tableName)
+		re.tableName = lib.SnakeToCamelCase(re.tableName)
 	case "snake":
-		tableName = lib.CamelToSnakeCase(tableName)
+		re.tableName = lib.CamelToSnakeCase(re.tableName)
 	}
 	if command == "INSERT" {
 		re.rawQuery += " INTO "
 	} else if command == "DELETE" {
 		re.rawQuery += " FROM "
 	}
-	re.rawQuery += " " + tableName + " "
-	re.preparedValue = nil
-	cols := "("
-	values := cols
-	if command == "UPDATE" {
-		values = ""
-	}
-	for i := 0; i < refValue.NumField(); i++ {
-		tagField := refValue.Type().Field(i).Tag
-		if strings.Contains(tagField.Get("json"), "autoincrement") {
-			continue
-		}
-		cols += tagField.Get("json") + ","
-		if command == "INSERT" {
-			values += "?,"
-		} else if command == "UPDATE" {
-			values += tagField.Get("rorm") + " = ?,"
-		}
-		re.preparedValue = append(re.preparedValue, refValue.Field(i).Interface())
-	}
-	cols = cols[:len(cols)-1]
-	values = values[:len(values)-1]
-	cols += ")"
-	if command == "INSERT" {
-		values += ")"
-		re.rawQuery += cols + " VALUES " + values
-	} else if command == "UPDATE" {
-		re.rawQuery += " SET " + values
-	}
+	re.rawQuery += " " + re.tableName + " " + re.column
+
 	re.rawQuery = re.adjustPreparedParam(re.rawQuery)
 	if re.condition != "" {
 		re.convertToPreparedCondition()
@@ -75,17 +66,28 @@ func (re *Engine) GenerateRawCUDQuery(command string, data interface{}) {
 }
 
 func (re *Engine) executeCUDQuery(cmd string) (int64, error) {
+	defer re.clearField()
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
+
 	prepared, err := re.db.PrepareContext(ctx, re.rawQuery)
 	if err != nil {
 		return 0, errors.New("Error When Prepare Statement: " + err.Error())
 	}
 	defer prepared.Close()
 
-	exec, err := prepared.ExecContext(ctx, re.preparedValue...)
-	if err != nil {
-		return 0, errors.New("Error When Execute Prepare Statement: " + err.Error())
+	var exec sql.Result
+	execErrString := "Error When Execute Prepare Statement: "
+	if re.isBulk {
+		for _, preparedVal := range re.multiPreparedValue {
+			if exec, err = prepared.ExecContext(ctx, preparedVal...); err != nil {
+				return 0, errors.New(execErrString + err.Error())
+			}
+		}
+	} else {
+		if exec, err = prepared.ExecContext(ctx, re.preparedValue...); err != nil {
+			return 0, errors.New(execErrString + err.Error())
+		}
 	}
 
 	if cmd == "INSERT" {
@@ -95,23 +97,58 @@ func (re *Engine) executeCUDQuery(cmd string) (int64, error) {
 	return exec.RowsAffected()
 }
 
-func (re *Engine) Insert(data interface{}) error {
-	if data == nil {
-		return errors.New("Need Parameter to be passed")
+func (re *Engine) preparedData(command string, data interface{}) {
+	dValue := reflect.ValueOf(data).Elem()
+	sdValue := dValue
+	if dValue.Kind() == reflect.Slice {
+		re.multiPreparedValue = nil
+		for i := 0; i < dValue.Len(); i++ {
+			sdValue = dValue.Index(i)
+			if i == dValue.Len()-1 {
+				break
+			}
+			if sdValue.Kind() == reflect.Ptr {
+				sdValue = sdValue.Elem()
+			}
+			re.preparedValue = nil
+			for x := 0; x < sdValue.NumField(); x++ {
+				re.preparedValue = append(re.preparedValue, sdValue.Field(x).Interface())
+			}
+			re.multiPreparedValue = append(re.multiPreparedValue, re.preparedValue)
+		}
 	}
-	command := "INSERT"
-	re.GenerateRawCUDQuery(command, data)
-	_, err := re.executeCUDQuery(command)
 
-	return err
-}
-
-func (re *Engine) Update(data interface{}) error {
-	if data == nil {
-		return errors.New("Need Parameter to be passed")
+	if sdValue.Kind() == reflect.Ptr {
+		sdValue = sdValue.Elem()
 	}
-	command := "INSERT"
-	re.GenerateRawCUDQuery(command, data)
-	_, err := re.executeCUDQuery(command)
-	return err
+	re.tableName = sdValue.Type().Name()
+
+	re.preparedValue = nil
+	cols := "("
+	values := "("
+	if command == "UPDATE" {
+		values = ""
+	}
+	for x := 0; x < sdValue.NumField(); x++ {
+		tagField := sdValue.Type().Field(x).Tag
+		col := strings.Split(tagField.Get("json"), ",")[0]
+		cols += col + ","
+		if command == "INSERT" {
+			values += "?,"
+		} else {
+			values += col + " = ?,"
+		}
+		re.preparedValue = append(re.preparedValue, sdValue.Field(x).Interface())
+	}
+	re.multiPreparedValue = append(re.multiPreparedValue, re.preparedValue)
+
+	cols = cols[:len(cols)-1]
+	values = values[:len(values)-1]
+	cols += ")"
+	if command == "INSERT" {
+		values += ")"
+		re.column = cols + " VALUES " + values
+	} else if command == "UPDATE" {
+		re.column = " SET " + values
+	}
 }

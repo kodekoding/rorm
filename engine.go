@@ -2,6 +2,7 @@ package rorm
 
 import (
 	"database/sql"
+	"log"
 	"net/url"
 	"regexp"
 	"strconv"
@@ -36,10 +37,13 @@ func New(cfg *DbConfig) *Engine {
 		options: &DbOptions{},
 	}
 	driver, connStr := generateConnectionString(cfg)
-	err := re.Connect(driver, connStr)
-	if err != nil {
+	if err := re.Connect(driver, connStr); err != nil {
+		log.Println("Error When Connect to DB: ", err.Error())
 		return nil
 	}
+	// set default for table case format
+	re.options.tbFormat = "snake"
+	log.Println("Successful Connect to DB")
 	return re
 }
 
@@ -100,10 +104,13 @@ func (re *Engine) clearField() {
 	re.tableName = ""
 	re.limit = ""
 	re.join = ""
+	re.isRaw = false
+	re.isBulk = false
 }
 
-func (re *Engine) SetTableOptions(dbOptions *DbOptions) {
-	re.options = dbOptions
+func (re *Engine) SetTableOptions(tbCaseFormat, tbPrefix string) {
+	re.options.tbFormat = tbCaseFormat
+	re.options.tbPrefix = tbPrefix
 }
 
 func (re *Engine) adjustPreparedParam(old string) string {

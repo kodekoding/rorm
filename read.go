@@ -16,27 +16,27 @@ import (
 	"github.com/radityaapratamaa/rorm/lib"
 )
 
-func (re *RormEngine) GetResults() []map[string]string {
+func (re *Engine) GetResults() []map[string]string {
 	return re.results
 }
 
-func (re *RormEngine) GetLastQuery() string {
+func (re *Engine) GetLastQuery() string {
 	return re.rawQuery
 }
 
-func (re *RormEngine) GetSingleResult() map[string]string {
+func (re *Engine) GetSingleResult() map[string]string {
 	if re.results == nil {
 		return nil
 	}
 	return re.results[0]
 }
 
-func (re *RormEngine) Select(col ...string) *RormEngine {
+func (re *Engine) Select(col ...string) *Engine {
 	re.column += strings.Join(col, ",")
 	return re
 }
 
-func (re *RormEngine) aggregateFuncSelect(command, col string, colAlias ...string) {
+func (re *Engine) aggregateFuncSelect(command, col string, colAlias ...string) {
 	if re.column != "" {
 		re.column += ","
 	}
@@ -46,56 +46,56 @@ func (re *RormEngine) aggregateFuncSelect(command, col string, colAlias ...strin
 	}
 }
 
-func (re *RormEngine) SelectSum(col string, colAlias ...string) *RormEngine {
+func (re *Engine) SelectSum(col string, colAlias ...string) *Engine {
 	re.aggregateFuncSelect("SUM", col, colAlias...)
 	return re
 }
 
-func (re *RormEngine) SelectAverage(col string, colAlias ...string) *RormEngine {
+func (re *Engine) SelectAverage(col string, colAlias ...string) *Engine {
 	re.aggregateFuncSelect("AVG", col, colAlias...)
 
 	return re
 }
 
-func (re *RormEngine) SelectMax(col string, colAlias ...string) *RormEngine {
+func (re *Engine) SelectMax(col string, colAlias ...string) *Engine {
 	re.aggregateFuncSelect("MAX", col, colAlias...)
 
 	return re
 }
 
-func (re *RormEngine) SelectMin(col string, colAlias ...string) *RormEngine {
+func (re *Engine) SelectMin(col string, colAlias ...string) *Engine {
 	re.aggregateFuncSelect("MIN", col, colAlias...)
 
 	return re
 }
 
-func (re *RormEngine) SelectCount(col string, colAlias ...string) *RormEngine {
+func (re *Engine) SelectCount(col string, colAlias ...string) *Engine {
 	re.aggregateFuncSelect("COUNT", col, colAlias...)
 
 	return re
 }
 
-func (re *RormEngine) Raw(rawQuery string) *RormEngine {
+func (re *Engine) Raw(rawQuery string) *Engine {
 	re.rawQuery = rawQuery
 	return re
 }
 
-func (re *RormEngine) From(tableName string) *RormEngine {
+func (re *Engine) From(tableName string) *Engine {
 	re.tableName = tableName
 	return re
 }
 
-func (re *RormEngine) Join(tabel, on string) *RormEngine {
+func (re *Engine) Join(tabel, on string) *Engine {
 	re.join += " JOIN " + tabel + " ON " + on
 	return re
 }
 
-func (re *RormEngine) GroupBy(col ...string) *RormEngine {
+func (re *Engine) GroupBy(col ...string) *Engine {
 	re.groupBy += strings.Join(col, ",")
 	return re
 }
 
-func (re *RormEngine) Where(col, value string, opt ...string) *RormEngine {
+func (re *Engine) Where(col, value string, opt ...string) *Engine {
 	if opt != nil {
 		re.generateCondition(col, value, opt[0], true)
 	} else {
@@ -104,19 +104,19 @@ func (re *RormEngine) Where(col, value string, opt ...string) *RormEngine {
 	return re
 }
 
-func (re *RormEngine) WhereIn(col string, listOfValues ...interface{}) *RormEngine {
+func (re *Engine) WhereIn(col string, listOfValues ...interface{}) *Engine {
 	value := re.generateInValue(listOfValues...)
 	re.generateCondition(col, value, "IN", true)
 	return re
 }
 
-func (re *RormEngine) WhereNotIn(col string, listOfValues ...interface{}) *RormEngine {
+func (re *Engine) WhereNotIn(col string, listOfValues ...interface{}) *Engine {
 	value := re.generateInValue(listOfValues...)
 	re.generateCondition(col, value, "NOT IN", true)
 	return re
 }
 
-func (re *RormEngine) generateInValue(listValues ...interface{}) string {
+func (re *Engine) generateInValue(listValues ...interface{}) string {
 	if listValues == nil {
 		log.Fatalf("Values cannot be nil")
 	}
@@ -140,26 +140,26 @@ func (re *RormEngine) generateInValue(listValues ...interface{}) string {
 	return value
 }
 
-func (re *RormEngine) OrIn(col string, listOfValues ...interface{}) *RormEngine {
+func (re *Engine) OrIn(col string, listOfValues ...interface{}) *Engine {
 	value := re.generateInValue(listOfValues...)
 	re.generateCondition(col, value, "IN", false)
 	return re
 }
-func (re *RormEngine) OrNotIn(col string, listOfValues ...interface{}) *RormEngine {
+func (re *Engine) OrNotIn(col string, listOfValues ...interface{}) *Engine {
 	value := re.generateInValue(listOfValues...)
 	re.generateCondition(col, value, "NOT IN", false)
 	return re
 }
-func (re *RormEngine) WhereLike(col, value string) *RormEngine {
+func (re *Engine) WhereLike(col, value string) *Engine {
 	re.generateCondition(col, value, "LIKE", true)
 	return re
 }
-func (re *RormEngine) OrLike(col, value string) *RormEngine {
+func (re *Engine) OrLike(col, value string) *Engine {
 	re.generateCondition(col, value, "LIKE", false)
 	return re
 }
 
-func (re *RormEngine) generateCondition(col, value, opt string, isAnd bool) {
+func (re *Engine) generateCondition(col, value, opt string, isAnd bool) {
 	if re.condition != "" {
 		if !isAnd {
 			re.condition += " OR "
@@ -176,7 +176,7 @@ func (re *RormEngine) generateCondition(col, value, opt string, isAnd bool) {
 	}
 }
 
-func (re *RormEngine) Or(col, value string, opt ...string) *RormEngine {
+func (re *Engine) Or(col, value string, opt ...string) *Engine {
 	if opt != nil {
 		re.generateCondition(col, value, opt[0], false)
 	} else {
@@ -186,11 +186,11 @@ func (re *RormEngine) Or(col, value string, opt ...string) *RormEngine {
 	return re
 }
 
-func (re *RormEngine) Having() {
+func (re *Engine) Having() {
 	// coming soon
 }
 
-func (re *RormEngine) OrderBy(col, value string) *RormEngine {
+func (re *Engine) OrderBy(col, value string) *Engine {
 	if re.orderBy != "" {
 		re.orderBy += ", "
 	}
@@ -198,7 +198,7 @@ func (re *RormEngine) OrderBy(col, value string) *RormEngine {
 	return re
 }
 
-func (re *RormEngine) Asc(col string) *RormEngine {
+func (re *Engine) Asc(col string) *Engine {
 	if re.orderBy != "" {
 		re.orderBy += ", "
 	}
@@ -206,7 +206,7 @@ func (re *RormEngine) Asc(col string) *RormEngine {
 	return re
 }
 
-func (re *RormEngine) Desc(col string) *RormEngine {
+func (re *Engine) Desc(col string) *Engine {
 	if re.orderBy != "" {
 		re.orderBy += ", "
 	}
@@ -214,7 +214,7 @@ func (re *RormEngine) Desc(col string) *RormEngine {
 	return re
 }
 
-func (re *RormEngine) Limit(limit int, offset ...int) *RormEngine {
+func (re *Engine) Limit(limit int, offset ...int) *Engine {
 	if offset != nil {
 		re.limit = strconv.Itoa(offset[0]) + ", "
 	}
@@ -223,7 +223,7 @@ func (re *RormEngine) Limit(limit int, offset ...int) *RormEngine {
 }
 
 // Get - Execute the Raw Query
-func (re *RormEngine) Get(pointerStruct interface{}) error {
+func (re *Engine) Get(pointerStruct interface{}) error {
 	var err error
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
@@ -241,26 +241,31 @@ func (re *RormEngine) Get(pointerStruct interface{}) error {
 		if err != nil {
 			return errors.New("Table Name cannot be set")
 		}
-		re.tableName = re.tablePrefix + re.tableName
+		re.tableName = re.options.tbPrefix + re.tableName + re.options.tbPostfix
 	}
-	re.rawQuery += " FROM " + re.tableName
+	re.rawQuery += " FROM "
+	re.rawQuery += re.tableName
 
 	if re.condition != "" {
 		// Convert the Condition Value into the prepared Statement Condition
 		re.convertToPreparedCondition()
-		re.rawQuery += " WHERE " + re.condition
+		re.rawQuery += " WHERE "
+		re.rawQuery += re.condition
 	}
 
 	if re.groupBy != "" {
-		re.rawQuery += " GROUP BY " + re.groupBy
+		re.rawQuery += " GROUP BY "
+		re.rawQuery += re.groupBy
 	}
 
 	if re.orderBy != "" {
-		re.rawQuery += " ORDER BY " + re.orderBy
+		re.rawQuery += " ORDER BY "
+		re.rawQuery += re.orderBy
 	}
 
 	if re.limit != "" {
-		re.rawQuery += " LIMIT " + re.limit
+		re.rawQuery += " LIMIT "
+		re.rawQuery += re.limit
 	}
 	fmt.Println(re.rawQuery)
 	// Set Prepared Raw Query
@@ -274,7 +279,7 @@ func (re *RormEngine) Get(pointerStruct interface{}) error {
 	// ===== Generated Query End =====
 
 	// Exec Query with Context 2 seconds
-	exec, err := prepared.QueryContext(ctx, re.conditionValue...)
+	exec, err := prepared.QueryContext(ctx, re.preparedValue...)
 	if err != nil {
 		re.clearField()
 		return errors.New("Error When Execute Prepared Statement: " + err.Error())
@@ -291,7 +296,7 @@ func (re *RormEngine) Get(pointerStruct interface{}) error {
 	return nil
 }
 
-func (re *RormEngine) scanToStruct(rows *sql.Rows, model interface{}) error {
+func (re *Engine) scanToStruct(rows *sql.Rows, model interface{}) error {
 	v := reflect.ValueOf(model)
 	if v.Kind() != reflect.Ptr {
 		return errors.New("must pass a pointer, not a value, to StructScan destination") // @todo add new error message
@@ -341,9 +346,11 @@ func (re *RormEngine) scanToStruct(rows *sql.Rows, model interface{}) error {
 		model = nil
 		return nil
 	}
-	bJson, _ := json.Marshal(willBeMarshall)
-	json.Unmarshal(bJson, model)
-	return nil
+	bJson, err := json.Marshal(willBeMarshall)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(bJson, model)
 	// }
 	// for i := 0; i < v.NumField(); i++ {
 	// 	field := strings.Split(t.Field(i).Tag.Get("rorm"), ",")[0]
@@ -377,7 +384,7 @@ func (re *RormEngine) scanToStruct(rows *sql.Rows, model interface{}) error {
 }
 
 //GetRows parses recordset into map
-func (re *RormEngine) getRows(rows *sql.Rows, pointerResult interface{}) error {
+func (re *Engine) getRows(rows *sql.Rows, pointerResult interface{}) error {
 	var results []map[string]interface{}
 	re.results = nil
 
@@ -426,13 +433,15 @@ func (re *RormEngine) getRows(rows *sql.Rows, pointerResult interface{}) error {
 		return err
 	}
 
-	bRes, _ := json.Marshal(results)
-	fmt.Printf("\n\n%#v\n\n%s", results, bRes)
-	json.Unmarshal(bRes, &pointerResult)
-	return nil
+	bRes, err := json.Marshal(results)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(bRes, &pointerResult)
+
 }
 
-func (re *RormEngine) convertToPreparedCondition() {
+func (re *Engine) convertToPreparedCondition() {
 	// regex := regexp.MustCompile(`(LIKE .?\W+([A-Za-z0-9]+)\W.?)|((=|<|>|>=|<=|<>|!=) .?([a-zA-Z0-9]+).?)`)
 
 	regex := regexp.MustCompile(`'(.*?)'`)
@@ -442,10 +451,10 @@ func (re *RormEngine) convertToPreparedCondition() {
 
 	re.condition = re.adjustPreparedParam(re.condition)
 
-	re.conditionValue = nil
+	re.preparedValue = nil
 	for _, val := range listOfValues {
 		val = strings.Replace(val, "'", "", -1)
-		re.conditionValue = append(re.conditionValue, val)
+		re.preparedValue = append(re.preparedValue, val)
 	}
 
 }

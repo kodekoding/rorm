@@ -10,7 +10,7 @@ import (
 	"github.com/radityaapratamaa/rorm/lib"
 )
 
-func (re *RormEngine) GenerateRawCUDQuery(command string, data interface{}) {
+func (re *Engine) GenerateRawCUDQuery(command string, data interface{}) {
 	refValue := reflect.ValueOf(data)
 	tableName := ""
 	re.rawQuery = command
@@ -25,14 +25,20 @@ func (re *RormEngine) GenerateRawCUDQuery(command string, data interface{}) {
 	}
 
 	// Change Table Name Camel Case to Snake Case
-	tableName = lib.CamelToSnakeCase(tableName)
+	tableName = re.options.tbPrefix + tableName + re.options.tbPostfix
+	switch re.options.tbFormat {
+	case "camel":
+		tableName = lib.SnakeToCamelCase(tableName)
+	case "snake":
+		tableName = lib.CamelToSnakeCase(tableName)
+	}
 	if command == "INSERT" {
 		re.rawQuery += " INTO "
 	} else if command == "DELETE" {
 		re.rawQuery += " FROM "
 	}
 	re.rawQuery += " " + tableName + " "
-	re.conditionValue = nil
+	re.preparedValue = nil
 	cols := "("
 	values := cols
 	if command == "UPDATE" {
@@ -49,7 +55,7 @@ func (re *RormEngine) GenerateRawCUDQuery(command string, data interface{}) {
 		} else if command == "UPDATE" {
 			values += tagField.Get("rorm") + " = ?,"
 		}
-		re.conditionValue = append(re.conditionValue, refValue.Field(i).Interface())
+		re.preparedValue = append(re.preparedValue, refValue.Field(i).Interface())
 	}
 	cols = cols[:len(cols)-1]
 	values = values[:len(values)-1]
@@ -63,11 +69,12 @@ func (re *RormEngine) GenerateRawCUDQuery(command string, data interface{}) {
 	re.rawQuery = re.adjustPreparedParam(re.rawQuery)
 	if re.condition != "" {
 		re.convertToPreparedCondition()
-		re.rawQuery += " WHERE " + re.condition
+		re.rawQuery += " WHERE "
+		re.rawQuery += re.condition
 	}
 }
 
-func (re *RormEngine) executeCUDQuery(cmd string) (int64, error) {
+func (re *Engine) executeCUDQuery(cmd string) (int64, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 	prepared, err := re.db.PrepareContext(ctx, re.rawQuery)
@@ -76,7 +83,7 @@ func (re *RormEngine) executeCUDQuery(cmd string) (int64, error) {
 	}
 	defer prepared.Close()
 
-	exec, err := prepared.ExecContext(ctx, re.conditionValue...)
+	exec, err := prepared.ExecContext(ctx, re.preparedValue...)
 	if err != nil {
 		return 0, errors.New("Error When Execute Prepare Statement: " + err.Error())
 	}
@@ -88,7 +95,7 @@ func (re *RormEngine) executeCUDQuery(cmd string) (int64, error) {
 	return exec.RowsAffected()
 }
 
-func (re *RormEngine) Insert(data interface{}) error {
+func (re *Engine) Insert(data interface{}) error {
 	if data == nil {
 		return errors.New("Need Parameter to be passed")
 	}
@@ -99,7 +106,7 @@ func (re *RormEngine) Insert(data interface{}) error {
 	return err
 }
 
-func (re *RormEngine) Update(data interface{}) error {
+func (re *Engine) Update(data interface{}) error {
 	if data == nil {
 		return errors.New("Need Parameter to be passed")
 	}

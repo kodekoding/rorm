@@ -56,13 +56,15 @@ func generateConnectionString(cfg *DbConfig) (dbDriver string, connectionString 
 	}
 	if cfg.Port != "" {
 		dbURL.Host += ":" + cfg.Port
+	} else {
+		log.Fatalln("Missing Port in RORM Config")
 	}
 
 	query := url.Values{}
 	dbURL.Path = cfg.DbName
 	switch dbDriver {
 	case "postgres":
-		query.Add("sslmode", "disabled")
+		query.Add("sslmode", "disable")
 		query.Add("search_path", "public")
 		if cfg.DbScheme != "" {
 			query.Set("search_path", cfg.DbScheme)
@@ -106,6 +108,9 @@ func (re *Engine) clearField() {
 	re.join = ""
 	re.isRaw = false
 	re.isBulk = false
+	re.preparedValue = nil
+	re.multiPreparedValue = nil
+	re.counter = 0
 }
 
 func (re *Engine) SetTableOptions(tbCaseFormat, tbPrefix string) {
@@ -115,7 +120,7 @@ func (re *Engine) SetTableOptions(tbCaseFormat, tbPrefix string) {
 
 func (re *Engine) adjustPreparedParam(old string) string {
 	if strings.TrimSpace(re.config.Driver) != "mysql" {
-		idx := 0
+
 		replacement := ""
 		switch re.config.Driver {
 		case "postgres":
@@ -130,8 +135,8 @@ func (re *Engine) adjustPreparedParam(old string) string {
 			if strings.Index(old, "?") == -1 {
 				break
 			}
-			idx++
-			old = strings.Replace(old, "?", replacement+strconv.Itoa(idx), 1)
+			re.counter++
+			old = strings.Replace(old, "?", replacement+strconv.Itoa(re.counter), 1)
 		}
 	}
 	return old

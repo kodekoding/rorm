@@ -464,7 +464,7 @@ func (re *Engine) convertToPreparedCondition() {
 
 	re.condition = re.adjustPreparedParam(re.condition)
 
-	re.preparedValue = nil
+	// re.preparedValue = nil
 	for _, val := range listOfValues {
 		val = strings.Replace(val, "'", "", -1)
 		re.preparedValue = append(re.preparedValue, val)

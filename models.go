@@ -37,6 +37,7 @@ type (
 	Operations struct {
 		isRaw              bool
 		isBulk             bool
+		counter            int
 		rawQuery           string
 		column             string
 		orderBy            string

@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
+	"log"
 	"reflect"
 	"strings"
 	"time"
@@ -30,71 +32,18 @@ func (re *Engine) Insert(data interface{}) error {
 
 func (re *Engine) Update(data interface{}) error {
 	dVal := reflect.ValueOf(data)
-	if data == nil || (dVal.Kind() != reflect.Ptr) || (dVal.Kind() == reflect.Slice) {
-		return errors.New("parameter cannot be nil, must be a pointer, and not slice")
+	if data == nil || (dVal.Kind() != reflect.Ptr) {
+		return errors.New("parameter cannot be nil, must be a pointer")
+	}
+
+	if dVal.Elem().Kind() == reflect.Slice {
+		return errors.New("data cannot be slice")
 	}
 	command := "UPDATE"
 	re.preparedData(command, data)
 	re.GenerateRawCUDQuery(command, data)
-	_, err := re.executeCUDQuery(command)
-	return err
-}
-func (re *Engine) GenerateRawCUDQuery(command string, data interface{}) {
-	re.rawQuery = command
-
-	re.tableName = re.options.tbPrefix + re.tableName + re.options.tbPostfix
-	// Adjustment Table Name to Case Format (if available)
-	switch re.options.tbFormat {
-	case "camel":
-		re.tableName = lib.SnakeToCamelCase(re.tableName)
-	case "snake":
-		re.tableName = lib.CamelToSnakeCase(re.tableName)
-	}
-	if command == "INSERT" {
-		re.rawQuery += " INTO "
-	} else if command == "DELETE" {
-		re.rawQuery += " FROM "
-	}
-	re.rawQuery += " " + re.tableName + " " + re.column
-
-	re.rawQuery = re.adjustPreparedParam(re.rawQuery)
-	if re.condition != "" {
-		re.convertToPreparedCondition()
-		re.rawQuery += " WHERE "
-		re.rawQuery += re.condition
-	}
-}
-
-func (re *Engine) executeCUDQuery(cmd string) (int64, error) {
-	defer re.clearField()
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-
-	prepared, err := re.db.PrepareContext(ctx, re.rawQuery)
-	if err != nil {
-		return 0, errors.New("Error When Prepare Statement: " + err.Error())
-	}
-	defer prepared.Close()
-
-	var exec sql.Result
-	execErrString := "Error When Execute Prepare Statement: "
-	if re.isBulk {
-		for _, preparedVal := range re.multiPreparedValue {
-			if exec, err = prepared.ExecContext(ctx, preparedVal...); err != nil {
-				return 0, errors.New(execErrString + err.Error())
-			}
-		}
-	} else {
-		if exec, err = prepared.ExecContext(ctx, re.preparedValue...); err != nil {
-			return 0, errors.New(execErrString + err.Error())
-		}
-	}
-
-	if cmd == "INSERT" {
-		return exec.LastInsertId()
-	}
-
-	return exec.RowsAffected()
+	// _, err := re.executeCUDQuery(command)
+	return nil
 }
 
 func (re *Engine) preparedData(command string, data interface{}) {
@@ -104,13 +53,13 @@ func (re *Engine) preparedData(command string, data interface{}) {
 		re.multiPreparedValue = nil
 		for i := 0; i < dValue.Len(); i++ {
 			sdValue = dValue.Index(i)
+			re.preparedValue = nil
 			if i == dValue.Len()-1 {
 				break
 			}
 			if sdValue.Kind() == reflect.Ptr {
 				sdValue = sdValue.Elem()
 			}
-			re.preparedValue = nil
 			for x := 0; x < sdValue.NumField(); x++ {
 				re.preparedValue = append(re.preparedValue, sdValue.Field(x).Interface())
 			}
@@ -123,7 +72,7 @@ func (re *Engine) preparedData(command string, data interface{}) {
 	}
 	re.tableName = sdValue.Type().Name()
 
-	re.preparedValue = nil
+	// re.preparedValue = nil
 	cols := "("
 	values := "("
 	if command == "UPDATE" {
@@ -151,4 +100,64 @@ func (re *Engine) preparedData(command string, data interface{}) {
 	} else if command == "UPDATE" {
 		re.column = " SET " + values
 	}
+}
+
+func (re *Engine) GenerateRawCUDQuery(command string, data interface{}) {
+	re.rawQuery = command
+
+	re.tableName = re.options.tbPrefix + re.tableName + re.options.tbPostfix
+	// Adjustment Table Name to Case Format (if available)
+	switch re.options.tbFormat {
+	case "camel":
+		re.tableName = lib.SnakeToCamelCase(re.tableName)
+	case "snake":
+		re.tableName = lib.CamelToSnakeCase(re.tableName)
+	}
+	if command == "INSERT" {
+		re.rawQuery += " INTO "
+	} else if command == "DELETE" {
+		re.rawQuery += " FROM "
+	}
+	re.rawQuery += " " + re.tableName + " " + re.column
+
+	fmt.Printf("Before: %s -> %#v -> %#v", re.rawQuery, re.preparedValue, re.multiPreparedValue)
+	re.rawQuery = re.adjustPreparedParam(re.rawQuery)
+	if re.condition != "" {
+		re.convertToPreparedCondition()
+		re.rawQuery += " WHERE "
+		re.rawQuery += re.condition
+	}
+	// fmt.Println(re.rawQuery)
+	fmt.Printf("\n\nAfter: %s -> %#v -> %#v", re.rawQuery, re.preparedValue, re.multiPreparedValue)
+}
+
+func (re *Engine) executeCUDQuery(cmd string) (int64, error) {
+	defer re.clearField()
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	log.Println(re.rawQuery)
+	prepared, err := re.db.PrepareContext(ctx, re.rawQuery)
+	if err != nil {
+		return 0, errors.New("Error When Prepare Statement: " + err.Error())
+	}
+	defer prepared.Close()
+	var exec sql.Result
+	execErrString := "Error When Execute Prepare Statement: "
+	if re.isBulk {
+		for _, preparedVal := range re.multiPreparedValue {
+			if exec, err = prepared.ExecContext(ctx, preparedVal...); err != nil {
+				return 0, errors.New(execErrString + err.Error())
+			}
+		}
+	} else {
+		if exec, err = prepared.ExecContext(ctx, re.preparedValue...); err != nil {
+			return 0, errors.New(execErrString + err.Error())
+		}
+	}
+
+	if cmd == "INSERT" {
+		return exec.LastInsertId()
+	}
+
+	return exec.RowsAffected()
 }

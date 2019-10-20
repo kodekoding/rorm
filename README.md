@@ -75,7 +75,9 @@ log.Println("Success Connect to Database")
 ```
 
 ### Create New SQL Select Query
+#### Init the models
 ```go
+    // Init the models (struct name MUST BE SAME with table name)
     type Student struct {
         // json tag, filled based on column name
         Name string `json:"name"`
@@ -89,38 +91,53 @@ log.Println("Success Connect to Database")
     // init student struct to variable
     var studentList []Student
     var student Student
-
+```
+#### Get All Data
+```go
     // Get All Students data
     if err := db.Get(&studentList); err != nil {
         log.Fatalln(err.Error())
     }
-    // it will generate : SELECT * FROM student
-
     log.Println("result is, ", studentList)
-
+```
+```sql
+    // it will generate : 
+    SELECT * FROM student
+```
+#### Get Multiple Result Data with Where Condition
+```go
     // Get Specific Data
     if err := db.Select("name, address, birth_date").Where("is_active", 1).Get(&studentList); err != nil {
         log.Fatalln(err.Error())
     }
-    // it will generate: 
-    // SELECT name, address, birth_date FROM student WHERE is_active = ?
     log.Println("result is, ", studentList)
-
+```
+```sql
+// it will generate: (prepared Statement)
+SELECT name, address, birth_date FROM student WHERE is_active = ?
+```
+```go
     // Get Specific Data (other example)
-    if err := db.Select("name, address, birth_date").Where("is_active", 1).WhereLike("name", "%Lorem%").Get(&studentList); err != nil {
+    if err := db.Select("name", "address", "birth_date").Where("is_active", 1).WhereLike("name", "%Lorem%").Get(&studentList); err != nil {
         log.Fatalln(err.Error())
     }
-    // it will generate: 
-    // SELECT name, address, birth_date FROM student WHERE is_active = ? AND name LIKE ?
     log.Println("result is, ", studentList)
-
+```
+```sql
+// it will generate: 
+SELECT name, address, birth_date FROM student WHERE is_active = ? AND name LIKE ?
+```
+#### Get Single Result Data with Where Condition
+```go
     // Get Specific Data (single Result)
     if err := db.Select("name, address, birth_date").Where("id", 1).Get(&studentList); err != nil {
         log.Fatalln(err.Error())
     }
-    // it will generate: 
-    // SELECT name, address, birth_date FROM student WHERE id = ?
     log.Println("result is, ", student)
+```
+```sql
+-- it will generate: 
+SELECT name, address, birth_date FROM student WHERE id = ?
 ```
 
 ## Benchmarking vs XORM

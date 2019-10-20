@@ -116,9 +116,12 @@ log.Println("Success Connect to Database")
 // it will generate: (prepared Statement)
 SELECT name, address, birth_date FROM student WHERE is_active = ?
 ```
+---
 ```go
     // Get Specific Data (other example)
-    if err := db.Select("name", "address", "birth_date").Where("is_active", 1).WhereLike("name", "%Lorem%").Get(&studentList); err != nil {
+    if err := db.Select("name", "address", "birth_date").
+    Where("is_active", 1).WhereLike("name", "%Lorem%").
+    Get(&studentList); err != nil {
         log.Fatalln(err.Error())
     }
     log.Println("result is, ", studentList)
@@ -130,7 +133,7 @@ SELECT name, address, birth_date FROM student WHERE is_active = ? AND name LIKE 
 #### Get Single Result Data with Where Condition
 ```go
     // Get Specific Data (single Result)
-    if err := db.Select("name, address, birth_date").Where("id", 1).Get(&studentList); err != nil {
+    if err := db.Select("name, address, birth_date").Where("id", 1).Get(&student); err != nil {
         log.Fatalln(err.Error())
     }
     log.Println("result is, ", student)

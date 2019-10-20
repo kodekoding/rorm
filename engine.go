@@ -2,6 +2,7 @@ package rorm
 
 import (
 	"database/sql"
+	"errors"
 	"log"
 	"net/url"
 	"regexp"
@@ -30,46 +31,57 @@ func (re *Engine) GetPreparedValues() []interface{} {
 // 	return re
 // }
 
-// New2 - init new RORM Engine
-func New(cfg *DbConfig) *Engine {
+// New - init new RORM Engine
+func New(cfg *DbConfig) (*Engine, error) {
 	re := &Engine{
 		config:  cfg,
 		options: &DbOptions{},
 	}
-	driver, connStr := generateConnectionString(cfg)
-	if err := re.Connect(driver, connStr); err != nil {
-		log.Println("Error When Connect to DB: ", err.Error())
-		return nil
+	connStr, err := generateConnectionString(cfg)
+	if err != nil {
+		return nil, err
+	}
+	if err := re.Connect(cfg.Driver, connStr); err != nil {
+		log.Println("Cannot Connect to DB: ", err.Error())
+		return nil, err
 	}
 	// set default for table case format
 	re.options.tbFormat = "snake"
 	log.Println("Successful Connect to DB")
-	return re
+	return re, nil
 }
 
-func generateConnectionString(cfg *DbConfig) (dbDriver string, connectionString string) {
-	dbDriver = cfg.Driver
+func generateConnectionString(cfg *DbConfig) (connectionString string, err error) {
+	if strings.TrimSpace(cfg.Driver) == "" || strings.TrimSpace(cfg.Host) == "" || strings.TrimSpace(cfg.Username) == "" || strings.TrimSpace(cfg.DbName) == "" {
+		err = errors.New("Config is not set correctly")
+		return
+	}
 	dbURL := &url.URL{
 		Scheme: cfg.Driver,
 		User:   url.UserPassword(cfg.Username, cfg.Password),
 		Host:   cfg.Host,
 	}
-	if cfg.Port != "" {
-		dbURL.Host += ":" + cfg.Port
-	}
 
 	query := url.Values{}
 	dbURL.Path = cfg.DbName
-	switch dbDriver {
+	switch cfg.Driver {
 	case "postgres":
-		query.Add("sslmode", "disabled")
+		query.Add("sslmode", "disable")
 		query.Add("search_path", "public")
 		if cfg.DbScheme != "" {
 			query.Set("search_path", cfg.DbScheme)
 		}
+		dbURL.Host += ":5432"
+		if cfg.Port != "" {
+			dbURL.Host = cfg.Host + ":" + cfg.Port
+		}
 	case "mysql":
 		if cfg.Protocol == "" {
 			cfg.Protocol = "tcp"
+		}
+		dbURL.Host += ":3306"
+		if cfg.Port != "" {
+			dbURL.Host = cfg.Host + ":" + cfg.Port
 		}
 		replacedStr := "@" + cfg.Protocol + "($1:$2)/"
 		rgx := regexp.MustCompile(`@([a-zA-Z0-9]+):([0-9]+)/`)
@@ -93,7 +105,6 @@ func generateConnectionString(cfg *DbConfig) (dbDriver string, connectionString 
 func (re *Engine) Connect(dbDriver, connectionURL string) error {
 	var err error
 	re.db, err = sql.Open(dbDriver, connectionURL)
-	re.config.Driver = dbDriver
 	return err
 }
 
@@ -106,6 +117,9 @@ func (re *Engine) clearField() {
 	re.join = ""
 	re.isRaw = false
 	re.isBulk = false
+	re.preparedValue = nil
+	re.multiPreparedValue = nil
+	re.counter = 0
 }
 
 func (re *Engine) SetTableOptions(tbCaseFormat, tbPrefix string) {
@@ -115,7 +129,7 @@ func (re *Engine) SetTableOptions(tbCaseFormat, tbPrefix string) {
 
 func (re *Engine) adjustPreparedParam(old string) string {
 	if strings.TrimSpace(re.config.Driver) != "mysql" {
-		idx := 0
+
 		replacement := ""
 		switch re.config.Driver {
 		case "postgres":
@@ -130,8 +144,8 @@ func (re *Engine) adjustPreparedParam(old string) string {
 			if strings.Index(old, "?") == -1 {
 				break
 			}
-			idx++
-			old = strings.Replace(old, "?", replacement+strconv.Itoa(idx), 1)
+			re.counter++
+			old = strings.Replace(old, "?", replacement+strconv.Itoa(re.counter), 1)
 		}
 	}
 	return old

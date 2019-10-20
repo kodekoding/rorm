@@ -25,6 +25,17 @@ func GetStructName(pointerStruct interface{}) (string, error) {
 	return CamelToSnakeCase(structName), nil
 }
 
+// CheckDataKind - Check data parameter when Create Update Delete Query
+func CheckDataKind(data reflect.Value, isInsert bool) error {
+	if data.Kind() != reflect.Ptr {
+		return errors.New("data is not pointer")
+	}
+	if !isInsert && data.Elem().Kind() == reflect.Slice {
+		return errors.New("data cannot be slice")
+	}
+	return nil
+}
+
 // CamelToSnakeCase - convert Camel Case to Snake Case
 func CamelToSnakeCase(str string) string {
 	var matchFirstCap = regexp.MustCompile("(.)([A-Z][a-z]+)")

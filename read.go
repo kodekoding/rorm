@@ -75,8 +75,11 @@ func (re *Engine) SelectCount(col string, colAlias ...string) *Engine {
 	return re
 }
 
-func (re *Engine) Raw(rawQuery string) *Engine {
+func (re *Engine) SQLRaw(rawQuery string, values ...interface{}) *Engine {
+	re.isRaw = true
 	re.rawQuery = rawQuery
+	re.rawQuery = re.adjustPreparedParam(re.rawQuery)
+	re.preparedValue = values
 	return re
 }
 
@@ -104,6 +107,15 @@ func (re *Engine) Where(col string, value interface{}, opt ...string) *Engine {
 	return re
 }
 
+func (re *Engine) WhereRaw(args string, value ...interface{}) *Engine {
+	if re.condition != "" {
+		re.condition += " AND "
+	}
+	re.condition += args
+	re.preparedValue = append(re.preparedValue, value...)
+	return re
+}
+
 func (re *Engine) WhereIn(col string, listOfValues ...interface{}) *Engine {
 	value := re.generateInValue(listOfValues...)
 	re.generateCondition(col, value, "IN", true)
@@ -114,6 +126,55 @@ func (re *Engine) WhereNotIn(col string, listOfValues ...interface{}) *Engine {
 	value := re.generateInValue(listOfValues...)
 	re.generateCondition(col, value, "NOT IN", true)
 	return re
+}
+
+func (re *Engine) WhereBetween(col string, val1, val2 interface{}) {
+	value := re.generateBetweenValue(val1, val2)
+	re.generateCondition(col, value, "BETWEEN", true)
+}
+
+func (re *Engine) WhereNotBetween(col string, val1, val2 interface{}) {
+	value := re.generateBetweenValue(val1, val2)
+	re.generateCondition(col, value, "NOT BETWEEN", true)
+}
+
+func (re *Engine) OrBetween(col string, val1, val2 interface{}) {
+	value := re.generateBetweenValue(val1, val2)
+	re.generateCondition(col, value, "BETWEEN", false)
+}
+
+func (re *Engine) OrNotBetween(col string, val1, val2 interface{}) {
+	value := re.generateBetweenValue(val1, val2)
+	re.generateCondition(col, value, "NOT BETWEEN", false)
+}
+
+func (re *Engine) generateBetweenValue(val1, val2 interface{}) string {
+	if val1 == nil || val2 == nil {
+		log.Fatalln("Values cannot be nil")
+	}
+
+	ref1 := reflect.ValueOf(val1)
+	ref2 := reflect.ValueOf(val2)
+
+	if ref1.Kind() != ref2.Kind() {
+		log.Fatalln("Between Values must have same datatype")
+	}
+	value := "'"
+	switch ref1.Kind() {
+	case reflect.Int:
+		value += strconv.FormatInt(ref1.Int(), 10)
+	case reflect.String:
+		value += ref1.String()
+	}
+	value += "' AND '"
+	switch ref2.Kind() {
+	case reflect.Int:
+		value += strconv.FormatInt(ref2.Int(), 10)
+	case reflect.String:
+		value += ref2.String()
+	}
+	value += "'"
+	return value
 }
 
 func (re *Engine) generateInValue(listValues ...interface{}) string {
@@ -245,45 +306,48 @@ func (re *Engine) Get(pointerStruct interface{}) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
-	//===== Generated Query Start =====
-	re.rawQuery = "SELECT "
-	if re.column == "" {
-		re.rawQuery += "*"
-	} else {
-		re.rawQuery += re.column
-	}
-
-	if re.tableName == "" {
-		re.tableName, err = lib.GetStructName(pointerStruct)
-		if err != nil {
-			return errors.New("Table Name cannot be set")
+	if !re.isRaw {
+		//===== Generated Query Start =====
+		re.rawQuery = "SELECT "
+		if re.column == "" {
+			re.rawQuery += "*"
+		} else {
+			re.rawQuery += re.column
 		}
-		re.tableName = re.options.tbPrefix + re.tableName + re.options.tbPostfix
-	}
-	re.rawQuery += " FROM "
-	re.rawQuery += re.tableName
 
-	if re.condition != "" {
-		// Convert the Condition Value into the prepared Statement Condition
-		re.convertToPreparedCondition()
-		re.rawQuery += " WHERE "
-		re.rawQuery += re.condition
+		if re.tableName == "" {
+			re.tableName, err = lib.GetStructName(pointerStruct)
+			if err != nil {
+				return errors.New("Table Name cannot be set")
+			}
+			re.tableName = re.options.tbPrefix + re.tableName + re.options.tbPostfix
+		}
+		re.rawQuery += " FROM "
+		re.rawQuery += re.tableName
+
+		if re.condition != "" {
+			// Convert the Condition Value into the prepared Statement Condition
+			re.convertToPreparedCondition()
+			re.rawQuery += " WHERE "
+			re.rawQuery += re.condition
+		}
+
+		if re.groupBy != "" {
+			re.rawQuery += " GROUP BY "
+			re.rawQuery += re.groupBy
+		}
+
+		if re.orderBy != "" {
+			re.rawQuery += " ORDER BY "
+			re.rawQuery += re.orderBy
+		}
+
+		if re.limit != "" {
+			re.rawQuery += " LIMIT "
+			re.rawQuery += re.limit
+		}
 	}
 
-	if re.groupBy != "" {
-		re.rawQuery += " GROUP BY "
-		re.rawQuery += re.groupBy
-	}
-
-	if re.orderBy != "" {
-		re.rawQuery += " ORDER BY "
-		re.rawQuery += re.orderBy
-	}
-
-	if re.limit != "" {
-		re.rawQuery += " LIMIT "
-		re.rawQuery += re.limit
-	}
 	fmt.Println(re.rawQuery)
 	// Set Prepared Raw Query
 	prepared, err := re.db.Prepare(re.rawQuery)
@@ -464,7 +528,7 @@ func (re *Engine) convertToPreparedCondition() {
 
 	re.condition = re.adjustPreparedParam(re.condition)
 
-	re.preparedValue = nil
+	// re.preparedValue = nil
 	for _, val := range listOfValues {
 		val = strings.Replace(val, "'", "", -1)
 		re.preparedValue = append(re.preparedValue, val)

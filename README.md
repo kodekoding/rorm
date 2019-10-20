@@ -9,12 +9,17 @@ NoSQL query will be coming soon too
 go get github.com/radityaapratamaa/rorm
 ```
 
+import to your project
+
+```go
+import "github.com/radityaapratamaa/rorm"
+```
 ## Features
 | Read          | CUD    |
 | :------------ | :----- |
 | Select        | Insert |
 | SelectSum     | Update |
-| SelectAverage |        |
+| SelectAverage | Delete       |
 | SelectMax     |        |
 | SelectMin     |        |
 | SelectCount   |        |
@@ -32,6 +37,91 @@ go get github.com/radityaapratamaa/rorm
 | OrderBy       |        |
 | Asc           |        |
 | Desc          |        |
+
+## How To Use
+### Configure the Host
+```go
+// Mandatory DBConfig
+dbConfig := &rorm.DbConfig{
+    Host: "localhost",
+    Driver: "(mysql | postgres | sqlserver)",
+    Username: "your_username",
+    DbName: "your_dbName",
+}
+```
+
+All Property DBConfig
+```go
+dbConfig := &rorm.DbConfig{
+    Host: "your_host", //mandatory
+    Driver: "DB Driver", //mandatory
+    Username: "dbUsername", //mandatory
+    DbName:"database_name", //mandatory
+    Password: "dbPass",
+    DbScheme: "db Scheme", // for postgres scheme, default is "Public" Scheme
+    Port: "port", //default 3306 (mysql), 5432 (postgres)
+    Protocol: "db Protocol", //default is "tcp"
+    DbInstance: "db Instance", // for sqlserver driver if necessary
+}
+```
+### Init New Engine
+```go
+// Please make sure the variable "dbConfig" pass by reference (pointer)
+db, err := rorm.New(dbConfig)
+if err != nil {
+    log.Fatalln("Cannot Connet to database")
+}
+log.Println("Success Connect to Database")
+```
+
+### Create New SQL Select Query
+```go
+    type Student struct {
+        // json tag, filled based on column name
+        Name string `json:"name"`
+        Address string `json:"address"`
+        // IsActive is boolean field
+        IsActive int `json:"is_active"`
+        // BirthDate is "Date" data type column field
+        BirthDate string `json:"birth_date"`
+    }
+
+    // init student struct to variable
+    var studentList []Student
+    var student Student
+
+    // Get All Students data
+    if err := db.Get(&studentList); err != nil {
+        log.Fatalln(err.Error())
+    }
+    // it will generate : SELECT * FROM student
+
+    log.Println("result is, ", studentList)
+
+    // Get Specific Data
+    if err := db.Select("name, address, birth_date").Where("is_active", 1).Get(&studentList); err != nil {
+        log.Fatalln(err.Error())
+    }
+    // it will generate: 
+    // SELECT name, address, birth_date FROM student WHERE is_active = ?
+    log.Println("result is, ", studentList)
+
+    // Get Specific Data (other example)
+    if err := db.Select("name, address, birth_date").Where("is_active", 1).WhereLike("name", "%Lorem%").Get(&studentList); err != nil {
+        log.Fatalln(err.Error())
+    }
+    // it will generate: 
+    // SELECT name, address, birth_date FROM student WHERE is_active = ? AND name LIKE ?
+    log.Println("result is, ", studentList)
+
+    // Get Specific Data (single Result)
+    if err := db.Select("name, address, birth_date").Where("id", 1).Get(&studentList); err != nil {
+        log.Fatalln(err.Error())
+    }
+    // it will generate: 
+    // SELECT name, address, birth_date FROM student WHERE id = ?
+    log.Println("result is, ", student)
+```
 
 ## Benchmarking vs XORM
 **go test -bench=.**

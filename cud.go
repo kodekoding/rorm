@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
 	"log"
 	"reflect"
 	"strings"
@@ -15,11 +14,13 @@ import (
 
 func (re *Engine) Insert(data interface{}) error {
 	dVal := reflect.ValueOf(data)
-	if data == nil || (dVal.Kind() != reflect.Ptr) {
-		return errors.New("parameter cannot be nil and must be a pointer")
+
+	if err := lib.CheckDataKind(dVal, true); err != nil {
+		return err
 	}
 	command := "INSERT"
 	if dVal.Elem().Kind() == reflect.Slice {
+
 		re.isBulk = true
 	}
 	// set column and preparedValue for executing data
@@ -32,18 +33,27 @@ func (re *Engine) Insert(data interface{}) error {
 
 func (re *Engine) Update(data interface{}) error {
 	dVal := reflect.ValueOf(data)
-	if data == nil || (dVal.Kind() != reflect.Ptr) {
-		return errors.New("parameter cannot be nil, must be a pointer")
+	if err := lib.CheckDataKind(dVal, false); err != nil {
+		return err
 	}
 
-	if dVal.Elem().Kind() == reflect.Slice {
-		return errors.New("data cannot be slice")
-	}
 	command := "UPDATE"
 	re.preparedData(command, data)
 	re.GenerateRawCUDQuery(command, data)
-	// _, err := re.executeCUDQuery(command)
-	return nil
+	// fmt.Println(re.rawQuery, re.preparedValue)
+	_, err := re.executeCUDQuery(command)
+	return err
+}
+
+func (re *Engine) Delete(data interface{}) error {
+	dVal := reflect.ValueOf(data)
+	if err := lib.CheckDataKind(dVal, false); err != nil {
+		return err
+	}
+	command := "DELETE"
+	re.GenerateRawCUDQuery(command, data)
+	_, err := re.executeCUDQuery(command)
+	return err
 }
 
 func (re *Engine) preparedData(command string, data interface{}) {
@@ -120,15 +130,12 @@ func (re *Engine) GenerateRawCUDQuery(command string, data interface{}) {
 	}
 	re.rawQuery += " " + re.tableName + " " + re.column
 
-	fmt.Printf("Before: %s -> %#v -> %#v", re.rawQuery, re.preparedValue, re.multiPreparedValue)
 	re.rawQuery = re.adjustPreparedParam(re.rawQuery)
 	if re.condition != "" {
 		re.convertToPreparedCondition()
 		re.rawQuery += " WHERE "
 		re.rawQuery += re.condition
 	}
-	// fmt.Println(re.rawQuery)
-	fmt.Printf("\n\nAfter: %s -> %#v -> %#v", re.rawQuery, re.preparedValue, re.multiPreparedValue)
 }
 
 func (re *Engine) executeCUDQuery(cmd string) (int64, error) {
@@ -155,9 +162,8 @@ func (re *Engine) executeCUDQuery(cmd string) (int64, error) {
 		}
 	}
 
-	if cmd == "INSERT" {
-		return exec.LastInsertId()
-	}
-
+	// if cmd == "INSERT" {
+	// 	return exec.LastInsertId()
+	// }
 	return exec.RowsAffected()
 }

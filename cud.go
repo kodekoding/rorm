@@ -20,7 +20,6 @@ func (re *Engine) Insert(data interface{}) error {
 	}
 	command := "INSERT"
 	if dVal.Elem().Kind() == reflect.Slice {
-
 		re.isBulk = true
 	}
 	// set column and preparedValue for executing data

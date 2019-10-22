@@ -1,8 +1,38 @@
+# Table Of Contents
+- [Table Of Contents](#Table-Of-Contents)
+- [RORM (Raw Query ORM)](#RORM-Raw-Query-ORM)
+  - [Support Database](#Support-Database)
+  - [Installation](#Installation)
+  - [Features](#Features)
+  - [How To Use](#How-To-Use)
+    - [Configure the Host](#Configure-the-Host)
+    - [Init New Engine](#Init-New-Engine)
+    - [Create New SQL Select Query](#Create-New-SQL-Select-Query)
+      - [Init the models](#Init-the-models)
+      - [Get All Data](#Get-All-Data)
+        - [With SQL Raw](#With-SQL-Raw)
+        - [WITH Query Builder](#WITH-Query-Builder)
+      - [Get Multiple Result Data with Where Condition](#Get-Multiple-Result-Data-with-Where-Condition)
+      - [Get Single Result Data with Where Condition](#Get-Single-Result-Data-with-Where-Condition)
+    - [Create, Update, Delete Query](#Create-Update-Delete-Query)
+      - [Insert](#Insert)
+        - [Single Insert](#Single-Insert)
+        - [Multiple Insert](#Multiple-Insert)
+      - [Update](#Update)
+      - [Delete](#Delete)
+  - [Benchmarking vs XORM](#Benchmarking-vs-XORM)
 # RORM (Raw Query ORM)
 Raw Query ORM Library for golang (postgres, mysql)
 other RDBMS coming soon
 
 NoSQL query will be coming soon too
+
+## Support Database
+| No   | Database   |
+| :--- | :--------- |
+| 1    | MySQL      |
+| 2    | Postgres   |
+| 3    | SQL Server |
 
 ## Installation
 ```go
@@ -19,7 +49,7 @@ import "github.com/radityaapratamaa/rorm"
 | :------------ | :----- |
 | Select        | Insert |
 | SelectSum     | Update |
-| SelectAverage | Delete       |
+| SelectAverage | Delete |
 | SelectMax     |        |
 | SelectMin     |        |
 | SelectCount   |        |
@@ -75,6 +105,16 @@ log.Println("Success Connect to Database")
 ```
 
 ### Create New SQL Select Query
+```sql
+    -- We Have a table with this structure
+    CREATE TABLE Student (
+        id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(100) NULL,
+        address TEXT NULL,
+        is_active BOOLEAN NULL,
+        birth_date DATE NULL, 
+    )
+```
 #### Init the models
 ```go
     // Init the models (struct name MUST BE SAME with table name)
@@ -93,6 +133,15 @@ log.Println("Success Connect to Database")
     var student Student
 ```
 #### Get All Data
+##### With SQL Raw
+```go
+    if err := db.SQLRaw(`SELECT name, address, birth_date FROM Student [JOIN ..... ON .....] 
+    [WHERE ......... [ORDER BY ...] [LIMIT ...]]`).Get(&studentList); err != nil {
+        log.Fatalln(err.Error())
+    }
+    log.Println("result is, ", studentList)
+```
+##### WITH Query Builder
 ```go
     // Get All Students data
     if err := db.Get(&studentList); err != nil {
@@ -101,7 +150,7 @@ log.Println("Success Connect to Database")
     log.Println("result is, ", studentList)
 ```
 ```sql
-    // it will generate : 
+    --  it will generate : 
     SELECT * FROM student
 ```
 #### Get Multiple Result Data with Where Condition
@@ -113,7 +162,7 @@ log.Println("Success Connect to Database")
     log.Println("result is, ", studentList)
 ```
 ```sql
-// it will generate: (prepared Statement)
+-- it will generate: (prepared Statement)
 SELECT name, address, birth_date FROM student WHERE is_active = ?
 ```
 ---
@@ -127,7 +176,7 @@ SELECT name, address, birth_date FROM student WHERE is_active = ?
     log.Println("result is, ", studentList)
 ```
 ```sql
-// it will generate: 
+-- it will generate: 
 SELECT name, address, birth_date FROM student WHERE is_active = ? AND name LIKE ?
 ```
 #### Get Single Result Data with Where Condition
@@ -141,6 +190,115 @@ SELECT name, address, birth_date FROM student WHERE is_active = ? AND name LIKE 
 ```sql
 -- it will generate: 
 SELECT name, address, birth_date FROM student WHERE id = ?
+```
+
+### Create, Update, Delete Query
+#### Insert
+##### Single Insert
+```go
+    dtStudent := Student{
+        Name: "test",
+        Address: "test",
+        IsActive: 1,
+        BirthDate: "2010-01-01",
+    }
+
+    affected, err := db.Insert(&dtStudent)
+    if err != nil {
+        log.Fatalln("Error When Insert")
+    }
+
+    if affected > 0 {
+        log.Println("Success Insert")
+    }
+```
+```sql
+    -- it will generate : (mysql)
+    INSERT INTO Student (name, address, is_active, birth_date) VALUES (?,?,?,?)
+    -- prepared Values :
+    -- ('test', 'test', 1, '2010-01-01')
+```
+##### Multiple Insert
+```go
+    dtStudents := []Student{
+        Student{
+            Name: "test",
+            Address: "test",
+            IsActive: 1,
+            BirthDate: "2010-01-01",
+        },
+        Student{
+            Name: "test2",
+            Address: "test2",
+            IsActive: 1,
+            BirthDate: "2010-01-02",
+        },
+        Student{
+            Name: "test3",
+            Address: "test3",
+            IsActive: 1,
+            BirthDate: "2010-01-03",
+        },
+    }
+
+    affected, err := db.Insert(&dtStudent)
+    if err != nil {
+        log.Fatalln("Error When Insert")
+    }
+
+    if affected > 0 {
+        log.Println("Success Insert")
+    }
+```
+```sql
+    -- it will generate : (mysql)
+    INSERT INTO Student (name, address, is_active, birth_date) VALUES (?,?,?,?)
+    -- prepared Values :
+    -- 1. ('test', 'test', 1, '2010-01-01')
+    -- 2. ('test2', 'test2', 1, '2010-01-02')
+    -- 3. ('test3', 'test3', 1, '2010-01-03')
+```
+
+#### Update
+```go
+    dtStudent := Student{
+        Name: "change",
+        Address: "change",
+        IsActive: 1,
+        BirthDate: "2010-01-10",
+    }
+
+    affected, err := db.Where("id", 1).Update(&dtStudent)
+    if err != nil {
+        log.Fatalln("Error When Update")
+    }
+
+    if affected > 0 {
+        log.Println("Success Update")
+    }
+```
+```sql
+    -- it will generate : (mysql)
+    UPDATE Student SET name = ?, address = ?, is_active = ?, birth_date = ? WHERE id = ?
+    -- prepared Values :
+    -- ('change', 'change', 1, '2010-01-10', 1)
+```
+#### Delete
+```go
+    affected, err := db.Where("id", 1).Delete(&Student{})
+    if err != nil {
+        log.Fatalln("Error When Delete")
+    }
+
+    if affected > 0 {
+        log.Println("Success Delete")
+    }
+```
+```sql
+    -- it will generate : (mysql)
+    DELETE FROM Student WHERE id = ?
+    -- prepared Values :
+    -- (1)
 ```
 
 ## Benchmarking vs XORM

@@ -23,10 +23,12 @@ func (re *Engine) Insert(data interface{}) error {
 		re.isBulk = true
 	}
 	// set column and preparedValue for executing data
-	re.preparedData(command, data)
-	re.GenerateRawCUDQuery(command, data)
+	if re.bulkCounter == 0 {
+		re.preparedData(command, data)
+		re.GenerateRawCUDQuery(command, data)
+	}
 	_, err := re.executeCUDQuery(command)
-
+	re.bulkCounter++
 	return err
 }
 

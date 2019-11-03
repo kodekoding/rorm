@@ -120,6 +120,7 @@ func (re *Engine) clearField() {
 	re.preparedValue = nil
 	re.multiPreparedValue = nil
 	re.counter = 0
+	re.bulkCounter = 0
 }
 
 func (re *Engine) SetTableOptions(tbCaseFormat, tbPrefix string) {

@@ -5,13 +5,11 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"log"
 	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/radityaapratamaa/rorm/lib"
 )
@@ -303,8 +301,7 @@ func (re *Engine) Limit(limit int, offset ...int) *Engine {
 func (re *Engine) Get(pointerStruct interface{}) error {
 	defer re.clearField()
 	var err error
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
+	ctx := context.Background()
 
 	if !re.isRaw {
 		//===== Generated Query Start =====
@@ -348,7 +345,6 @@ func (re *Engine) Get(pointerStruct interface{}) error {
 		}
 	}
 
-	fmt.Println(re.rawQuery)
 	// Set Prepared Raw Query
 	prepared, err := re.db.Prepare(re.rawQuery)
 	if err != nil {

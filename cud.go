@@ -140,7 +140,9 @@ func (re *Engine) GenerateRawCUDQuery(command string, data interface{}) {
 }
 
 func (re *Engine) executeCUDQuery(cmd string) (int64, error) {
-	defer re.clearField()
+	if !re.bulkOptimized {
+		defer re.clearField()
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 	log.Println(re.rawQuery)

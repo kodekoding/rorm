@@ -37,6 +37,7 @@ type (
 	Operations struct {
 		isRaw              bool
 		isBulk             bool
+		bulkOptimized      bool
 		bulkCounter        int
 		counter            int
 		rawQuery           string

@@ -11,6 +11,9 @@ type (
 		GetDB() *sql.DB
 		GetPreparedValues() []interface{}
 
+		StartBulkOptimized()
+		StopBulkOptimized()
+
 		GenerateRawCUDQuery(command string, data interface{})
 
 		GetLastQuery() string

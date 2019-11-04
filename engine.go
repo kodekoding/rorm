@@ -123,6 +123,15 @@ func (re *Engine) clearField() {
 	re.bulkCounter = 0
 }
 
+func (re *Engine) StartBulkOptimized() {
+	re.bulkOptimized = true
+	re.bulkCounter = 0
+}
+func (re *Engine) StopBulkOptimized() {
+	re.bulkOptimized = false
+	re.clearField()
+}
+
 func (re *Engine) SetTableOptions(tbCaseFormat, tbPrefix string) {
 	re.options.tbFormat = tbCaseFormat
 	re.options.tbPrefix = tbPrefix

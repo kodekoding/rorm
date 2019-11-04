@@ -4,11 +4,10 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"log"
 	"reflect"
 	"strings"
-	"time"
 
+	"github.com/radityaapratamaa/rorm/constants"
 	"github.com/radityaapratamaa/rorm/lib"
 )
 
@@ -143,25 +142,23 @@ func (re *Engine) executeCUDQuery(cmd string) (int64, error) {
 	if !re.bulkOptimized {
 		defer re.clearField()
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-	log.Println(re.rawQuery)
+	ctx := context.Background()
+
 	prepared, err := re.db.PrepareContext(ctx, re.rawQuery)
 	if err != nil {
-		return 0, errors.New("Error When Prepare Statement: " + err.Error())
+		return 0, errors.New(constants.ErrPrepareStatement + err.Error())
 	}
 	defer prepared.Close()
 	var exec sql.Result
-	execErrString := "Error When Execute Prepare Statement: "
 	if re.isBulk {
 		for _, preparedVal := range re.multiPreparedValue {
 			if exec, err = prepared.ExecContext(ctx, preparedVal...); err != nil {
-				return 0, errors.New(execErrString + err.Error())
+				return 0, errors.New(constants.ErrExecutePrepareStatement + err.Error())
 			}
 		}
 	} else {
 		if exec, err = prepared.ExecContext(ctx, re.preparedValue...); err != nil {
-			return 0, errors.New(execErrString + err.Error())
+			return 0, errors.New(constants.ErrExecutePrepareStatement + err.Error())
 		}
 	}
 

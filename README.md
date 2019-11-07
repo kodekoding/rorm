@@ -21,30 +21,71 @@
     - [Update](#Update)
     - [Delete](#Delete)
 # RORM (Raw Query ORM) Description
-Raw Query ORM Library for golang (postgres, mysql)
-other RDBMS coming soon
-
-NoSQL query will be coming soon too
-
+Raw Query ORM is a Query Builder as light as raw query and as easy as ORM
 
 # Benchmarking vs XORM
-**go test -bench=.**
+source : https://github.com/kihamo/orm-benchmark
+command : ``` orm-benchmark -orm=xorm,rorm (-multi=1 default) ```
+
 ```bash
-goos: darwin
-goarch: amd64
-pkg: sample_file/test_rorm
-BenchmarkInsertRorm-4               1000           1796572 ns/op             433 B/op          6 allocs/op
-BenchmarkInsertRorm100-4            1000           1601391 ns/op             433 B/op          6 allocs/op
-BenchmarkInsertRorm1000-4           1000           1531493 ns/op             436 B/op          6 allocs/op
-BenchmarkInsertRorm10000-4          1000           1538203 ns/op             434 B/op          6 allocs/op
-BenchmarkInsertXorm-4                500           2379465 ns/op            2320 B/op         59 allocs/op
-BenchmarkInsertXorm100-4            1000           2528573 ns/op            2241 B/op         59 allocs/op
-BenchmarkInsertXorm1000-4           1000           2245033 ns/op            2239 B/op         59 allocs/op
-BenchmarkInsertXorm10000-4          1000           2275546 ns/op            2243 B/op         59 allocs/op
-PASS
-ok      sample_file/test_rorm   16.279s
+Reports: 
+
+  2000 times - Insert
+       raw:     3.32s      1660658 ns/op     568 B/op     14 allocs/op
+      xorm:     5.38s      2688668 ns/op    2585 B/op     69 allocs/op
+      rorm:     5.58s      2787619 ns/op    1052 B/op     14 allocs/op
+
+   500 times - MultiInsert 100 row
+       raw:     2.48s      4961667 ns/op  110997 B/op   1110 allocs/op
+      xorm:     2.79s      5578304 ns/op  230925 B/op   4964 allocs/op
+      rorm:    90.84s    181683062 ns/op   53478 B/op    709 allocs/op
+
+  2000 times - Update
+       raw:     1.66s       830352 ns/op     632 B/op     16 allocs/op
+      xorm:     3.29s      1642816 ns/op    2914 B/op    108 allocs/op
+      rorm:     3.40s      1700092 ns/op   13935 B/op    188 allocs/op
+
+  4000 times - Read
+      rorm:     3.35s       837601 ns/op    6213 B/op     85 allocs/op
+       raw:     3.37s       841311 ns/op    1432 B/op     37 allocs/op
+      xorm:     7.08s      1770239 ns/op    9762 B/op    268 allocs/op
+
+  2000 times - MultiRead limit 100
+       raw:     2.65s      1326544 ns/op   34720 B/op   1320 allocs/op
+      rorm:     4.28s      2139107 ns/op   48668 B/op   1622 allocs/op
+      xorm:     5.85s      2926974 ns/op  178591 B/op   7892 allocs/op
 ```
 
+command: ``` orm-benchmark -orm=xorm,rorm,raw -multi=10 ```
+
+```
+Reports: 
+
+ 20000 times - Insert
+       raw:    25.43s      1271440 ns/op     568 B/op     14 allocs/op
+      rorm:    37.36s      1867861 ns/op    1027 B/op     14 allocs/op
+      xorm:    39.14s      1956955 ns/op    2578 B/op     69 allocs/op
+
+  5000 times - MultiInsert 100 row
+       raw:    20.76s      4151136 ns/op  110910 B/op   1110 allocs/op
+      xorm:    23.63s      4726541 ns/op  230813 B/op   4964 allocs/op
+      rorm:    725.63s    145125198 ns/op   53322 B/op    707 allocs/op
+
+ 20000 times - Update
+       raw:    11.96s       598057 ns/op     632 B/op     16 allocs/op
+      xorm:    23.55s      1177686 ns/op    2914 B/op    108 allocs/op
+      rorm:    33.16s      1658050 ns/op   13901 B/op    188 allocs/op
+
+ 40000 times - Read
+       raw:    23.60s       589875 ns/op    1432 B/op     37 allocs/op
+      rorm:    32.00s       799907 ns/op    6188 B/op     85 allocs/op
+      xorm:    53.26s      1331431 ns/op    9762 B/op    268 allocs/op
+
+ 20000 times - MultiRead limit 100
+       raw:    17.87s       893332 ns/op   34720 B/op   1320 allocs/op
+      rorm:    41.47s      2073701 ns/op   48612 B/op   1622 allocs/op
+      xorm:    49.59s      2479707 ns/op  178586 B/op   7892 allocs/op
+```
 # Support Database
 | No   | Database   |
 | :--- | :--------- |
@@ -63,28 +104,28 @@ import to your project
 import "github.com/radityaapratamaa/rorm"
 ```
 # Features
-| Read          | CUD    |
-| :------------ | :----- |
-| Select        | Insert |
-| SelectSum     | Update |
-| SelectAverage | Delete |
-| SelectMax     |        |
-| SelectMin     |        |
-| SelectCount   |        |
-| Where         |        |
-| WhereIn       |        |
-| WhereNotIn    |        |
-| WhereLike     |        |
-| Or            |        |
-| OrIn          |        |
-| OrNotIn       |        |
-| OrLike        |        |
-| GroupBy       |        |
-| Join          |        |
-| Limit         |        |
-| OrderBy       |        |
-| Asc           |        |
-| Desc          |        |
+| Feature       | Using                                               | Description                                                                                                      |
+| :------------ | :-------------------------------------------------- | :--------------------------------------------------------------------------------------------------------------- |
+| Select        | Select(cols ...string)                              | Specify the column will be query                                                                                 |
+| SelectSum     | SelectSumn(col string)                              | Specify the single column to be summarize                                                                        |
+| SelectAverage | SelectAverage(col string)                           | Specify the single column to average the value                                                                   |
+| SelectMax     | SelectMax(col string)                               | Specify the single column to get max the value                                                                   |
+| SelectMin     | SelectMin(col string)                               | Specify the single column to get min the value                                                                   |
+| SelectCount   | SelectCount(col string)                             | Specify the single column to get total data that column                                                          |
+| Where         | Where(col string, value interface{}, opt ...string) | set the condition, ex: Where("id", 1, ">") -> **"WHERE id > 1"** Where("name", "test") => **"WHERE name = 'test'"** |
+| WhereIn       |                                                     |
+| WhereNotIn    |                                                     |
+| WhereLike     |                                                     |
+| Or            |                                                     |
+| OrIn          |                                                     |
+| OrNotIn       |                                                     |
+| OrLike        |                                                     |
+| GroupBy       |                                                     |
+| Join          |                                                     |
+| Limit         |                                                     |
+| OrderBy       |                                                     |
+| Asc           |                                                     |
+| Desc          |                                                     |
 
 # How To Use
 ## Configure the Host
@@ -137,13 +178,14 @@ log.Println("Success Connect to Database")
 ```go
     // Init the models (struct name MUST BE SAME with table name)
     type Student struct {
-        // json tag, filled based on column name
-        Name string `json:"name"`
-        Address string `json:"address"`
+        // db tag, filled based on column name
+        Id int `db:"id"`
+        Name string 
+        Address string
         // IsActive is boolean field
-        IsActive int `json:"is_active"`
+        IsActive bool `db:"is_active"`
         // BirthDate is "Date" data type column field
-        BirthDate string `json:"birth_date"`
+        BirthDate string `db:"birth_date"`
     }
 
     // init student struct to variable
@@ -176,7 +218,7 @@ log.Println("Success Connect to Database")
 ### Get Multiple Result Data with Where Condition
 ```go
     // Get Specific Data
-    if err := db.Select("name, address, birth_date").Where("is_active", 1).Get(&studentList); err != nil {
+    if err := db.Select("name, address, birth_date").Where("is_active", true).Get(&studentList); err != nil {
         log.Fatalln(err.Error())
     }
     log.Println("result is, ", studentList)

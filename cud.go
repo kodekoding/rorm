@@ -57,31 +57,7 @@ func (re *Engine) Delete(data interface{}) error {
 }
 
 func (re *Engine) preparedData(command string, data interface{}) {
-	dValue := reflect.ValueOf(data).Elem()
-	sdValue := dValue
-	if dValue.Kind() == reflect.Slice {
-		re.multiPreparedValue = nil
-		for i := 0; i < dValue.Len(); i++ {
-			sdValue = dValue.Index(i)
-			re.preparedValue = nil
-			if i == dValue.Len()-1 {
-				break
-			}
-			if sdValue.Kind() == reflect.Ptr {
-				sdValue = sdValue.Elem()
-			}
-			for x := 0; x < sdValue.NumField(); x++ {
-				re.preparedValue = append(re.preparedValue, sdValue.Field(x).Interface())
-			}
-			re.multiPreparedValue = append(re.multiPreparedValue, re.preparedValue)
-		}
-	}
-
-	if sdValue.Kind() == reflect.Ptr {
-		sdValue = sdValue.Elem()
-	}
-	re.tableName = sdValue.Type().Name()
-
+	sdValue := re.extractTableName(data)
 	// re.preparedValue = nil
 	cols := "("
 	values := "("
@@ -150,6 +126,7 @@ func (re *Engine) executeCUDQuery(cmd string) (int64, error) {
 	}
 	defer prepared.Close()
 	var exec sql.Result
+	var affectedRows int64
 	if re.isBulk {
 		for _, preparedVal := range re.multiPreparedValue {
 			if exec, err = prepared.ExecContext(ctx, preparedVal...); err != nil {
@@ -160,10 +137,12 @@ func (re *Engine) executeCUDQuery(cmd string) (int64, error) {
 		if exec, err = prepared.ExecContext(ctx, re.preparedValue...); err != nil {
 			return 0, errors.New(constants.ErrExecutePrepareStatement + err.Error())
 		}
+		affected, _ := exec.RowsAffected()
+		affectedRows += affected
 	}
 
 	// if cmd == "INSERT" {
 	// 	return exec.LastInsertId()
 	// }
-	return exec.RowsAffected()
+	return affectedRows, nil
 }

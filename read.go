@@ -297,11 +297,8 @@ func (re *Engine) Limit(limit int, offset ...int) *Engine {
 	return re
 }
 
-// Get - Execute the Raw Query
-func (re *Engine) Get(pointerStruct interface{}) error {
-	defer re.clearField()
-	var err error
-	ctx := context.Background()
+// return (*sql.Stmt, error)
+func (re *Engine) generateSelectQuery() {
 
 	if !re.isRaw {
 		//===== Generated Query Start =====
@@ -310,14 +307,6 @@ func (re *Engine) Get(pointerStruct interface{}) error {
 			re.rawQuery += "*"
 		} else {
 			re.rawQuery += re.column
-		}
-
-		if re.tableName == "" {
-			re.tableName, err = lib.GetStructName(pointerStruct)
-			if err != nil {
-				return errors.New("Table Name cannot be set")
-			}
-			re.tableName = re.options.tbPrefix + re.tableName + re.options.tbPostfix
 		}
 		re.rawQuery += " FROM "
 		re.rawQuery += re.tableName
@@ -346,26 +335,41 @@ func (re *Engine) Get(pointerStruct interface{}) error {
 	}
 
 	// Set Prepared Raw Query
-	prepared, err := re.db.Prepare(re.rawQuery)
-	if err != nil {
-		return errors.New("Error When Prepared Query: " + err.Error())
-	}
-	defer prepared.Close()
+	// return re.db.Prepare(re.rawQuery)
+}
 
-	// ===== Generated Query End =====
-
-	// Exec Query with Context 2 seconds
-	exec, err := prepared.QueryContext(ctx, re.preparedValue...)
-	if err != nil {
-		return errors.New("Error When Execute Prepared Statement: " + err.Error())
+// Get - Execute the Raw Query and get Multi Rows Result
+func (re *Engine) Get(pointerStruct interface{}) error {
+	defer re.clearField()
+	// var err error
+	dVal := reflect.ValueOf(pointerStruct)
+	if err := lib.CheckDataKind(dVal, true); err != nil {
+		return err
 	}
-	defer exec.Close()
+	// ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	// defer cancel()
+	ctx := context.Background()
+	// if re.tableName, err = lib.GetStructName(pointerStruct); err != nil {
+	// 	return err
+	// }
+	re.extractTableName(pointerStruct)
 
-	// Store the result to pointer struct
-	err = re.scanToStruct(exec, pointerStruct)
-	if err != nil {
-		return errors.New("Error When Get Rows: " + err.Error())
+	re.generateSelectQuery()
+
+	if re.isMultiRows {
+		return re.db.SelectContext(ctx, pointerStruct, re.rawQuery, re.preparedValue...)
 	}
+	return re.db.GetContext(ctx, pointerStruct, re.rawQuery, re.preparedValue...)
+
+}
+
+func (re *Engine) scanToStructv2(rows *sql.Rows, model interface{}) error {
+
+	mType := reflect.TypeOf(model)
+	sliceElem := reflect.MakeSlice(reflect.SliceOf(mType), 0, 0).Interface()
+	// sliceElem := reflect.MakeSlice(reflect.SliceOf(mType), 0, 0) //.Interface()
+	log.Printf("%#v -> %#v ", sliceElem, mType)
+	// sliceElem.
 	return nil
 }
 

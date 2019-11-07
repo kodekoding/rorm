@@ -1,20 +1,24 @@
 package rorm
 
 import (
-	"database/sql"
 	"errors"
 	"log"
 	"net/url"
+	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/radityaapratamaa/rorm/lib"
+
+	"github.com/jmoiron/sqlx"
 )
 
-func (re *Engine) SetDB(db *sql.DB) {
+func (re *Engine) SetDB(db *sqlx.DB) {
 	re.db = db
 }
 
-func (re *Engine) GetDB() *sql.DB {
+func (re *Engine) GetDB() *sqlx.DB {
 	return re.db
 }
 
@@ -101,10 +105,53 @@ func generateConnectionString(cfg *DbConfig) (connectionString string, err error
 	return
 }
 
+func (re *Engine) extractTableName(data interface{}) reflect.Value {
+	dValue := reflect.ValueOf(data).Elem()
+
+	sdValue := dValue
+	if dValue.Kind() == reflect.Slice {
+		re.Operations.isMultiRows = true
+		re.multiPreparedValue = nil
+		for i := 0; i < dValue.Len(); i++ {
+			sdValue = dValue.Index(i)
+			re.preparedValue = nil
+			if i == dValue.Len()-1 {
+				break
+			}
+			if sdValue.Kind() == reflect.Ptr {
+				sdValue = sdValue.Elem()
+			}
+			for x := 0; x < sdValue.NumField(); x++ {
+				re.preparedValue = append(re.preparedValue, sdValue.Field(x).Interface())
+			}
+			re.multiPreparedValue = append(re.multiPreparedValue, re.preparedValue)
+		}
+	}
+	tblName := ""
+	switch sdValue.Kind() {
+	case reflect.Ptr:
+		sdValue = sdValue.Elem()
+		tblName = sdValue.Type().Name()
+	case reflect.Slice:
+		sdType := dValue.Type()
+		strName := sdType.String()
+		log.Println(strName)
+		tblName = strName[strings.Index(strName, ".")+1:]
+	default:
+		tblName = sdValue.Type().Name()
+	}
+	if re.options.tbFormat == "snake" {
+		re.tableName = lib.CamelToSnakeCase(tblName)
+	} else {
+		re.tableName = lib.SnakeToCamelCase(tblName)
+	}
+	return sdValue
+}
+
 // Connect - connect to db Driver
 func (re *Engine) Connect(dbDriver, connectionURL string) error {
 	var err error
-	re.db, err = sql.Open(dbDriver, connectionURL)
+	re.db, err = sqlx.Open(dbDriver, connectionURL)
 	return err
 }
 
@@ -117,6 +164,7 @@ func (re *Engine) clearField() {
 	re.join = ""
 	re.isRaw = false
 	re.isBulk = false
+	re.isMultiRows = false
 	re.preparedValue = nil
 	re.multiPreparedValue = nil
 	re.counter = 0

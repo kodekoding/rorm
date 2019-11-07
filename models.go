@@ -1,11 +1,11 @@
 package rorm
 
-import "database/sql"
+import "github.com/jmoiron/sqlx"
 
 type (
 	// Engine - Raw Query ORM Engine structure
 	Engine struct {
-		db      *sql.DB
+		db      *sqlx.DB
 		config  *DbConfig
 		options *DbOptions
 		result  map[string]string
@@ -37,6 +37,7 @@ type (
 	Operations struct {
 		isRaw              bool
 		isBulk             bool
+		isMultiRows        bool
 		bulkOptimized      bool
 		bulkCounter        int
 		counter            int

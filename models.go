@@ -5,12 +5,13 @@ import "github.com/jmoiron/sqlx"
 type (
 	// Engine - Raw Query ORM Engine structure
 	Engine struct {
-		db      *sqlx.DB
-		config  *DbConfig
-		options *DbOptions
-		result  map[string]string
-		results []map[string]string
-		Operations
+		db               *sqlx.DB
+		config           *DbConfig
+		options          *DbOptions
+		result           map[string]string
+		results          []map[string]string
+		connectionString string
+		operations
 	}
 
 	// DbConfig - DB Connection struct
@@ -34,7 +35,7 @@ type (
 		colFormat string //column format (camel case/snake case)
 	}
 	// Operations - list of property query string
-	Operations struct {
+	operations struct {
 		isRaw              bool
 		isBulk             bool
 		isMultiRows        bool

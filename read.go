@@ -333,9 +333,6 @@ func (re *Engine) generateSelectQuery() {
 			re.rawQuery += re.limit
 		}
 	}
-
-	// Set Prepared Raw Query
-	// return re.db.Prepare(re.rawQuery)
 }
 
 // Get - Execute the Raw Query and get Multi Rows Result

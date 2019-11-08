@@ -2,10 +2,10 @@ package rorm
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"reflect"
 	"strings"
+	"time"
 
 	"github.com/radityaapratamaa/rorm/constants"
 	"github.com/radityaapratamaa/rorm/lib"
@@ -40,7 +40,6 @@ func (re *Engine) Update(data interface{}) error {
 	command := "UPDATE"
 	re.preparedData(command, data)
 	re.GenerateRawCUDQuery(command, data)
-	// fmt.Println(re.rawQuery, re.preparedValue)
 	_, err := re.executeCUDQuery(command)
 	return err
 }
@@ -66,7 +65,7 @@ func (re *Engine) preparedData(command string, data interface{}) {
 	}
 	for x := 0; x < sdValue.NumField(); x++ {
 		tagField := sdValue.Type().Field(x).Tag
-		col := strings.Split(tagField.Get("json"), ",")[0]
+		col := strings.Split(tagField.Get("db"), ",")[0]
 		cols += col + ","
 		if command == "INSERT" {
 			values += "?,"
@@ -118,31 +117,21 @@ func (re *Engine) executeCUDQuery(cmd string) (int64, error) {
 	if !re.bulkOptimized {
 		defer re.clearField()
 	}
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
 
-	prepared, err := re.db.PrepareContext(ctx, re.rawQuery)
+	prepared, err := re.db.PreparexContext(ctx, re.rawQuery)
 	if err != nil {
 		return 0, errors.New(constants.ErrPrepareStatement + err.Error())
 	}
 	defer prepared.Close()
-	var exec sql.Result
-	var affectedRows int64
-	if re.isBulk {
-		for _, preparedVal := range re.multiPreparedValue {
-			if exec, err = prepared.ExecContext(ctx, preparedVal...); err != nil {
-				return 0, errors.New(constants.ErrExecutePrepareStatement + err.Error())
-			}
-		}
-	} else {
-		if exec, err = prepared.ExecContext(ctx, re.preparedValue...); err != nil {
-			return 0, errors.New(constants.ErrExecutePrepareStatement + err.Error())
-		}
-		affected, _ := exec.RowsAffected()
-		affectedRows += affected
-	}
 
-	// if cmd == "INSERT" {
-	// 	return exec.LastInsertId()
-	// }
+	var affectedRows int64
+	for _, pv := range re.multiPreparedValue {
+		if _, err = prepared.ExecContext(ctx, pv...); err != nil {
+			return int64(0), err
+		}
+		affectedRows++
+	}
 	return affectedRows, nil
 }

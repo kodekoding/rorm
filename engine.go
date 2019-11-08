@@ -37,15 +37,16 @@ func (re *Engine) GetPreparedValues() []interface{} {
 
 // New - init new RORM Engine
 func New(cfg *DbConfig) (*Engine, error) {
+	var err error
 	re := &Engine{
 		config:  cfg,
 		options: &DbOptions{},
 	}
-	connStr, err := generateConnectionString(cfg)
+	re.connectionString, err = generateConnectionString(cfg)
 	if err != nil {
 		return nil, err
 	}
-	if err := re.Connect(cfg.Driver, connStr); err != nil {
+	if err := re.Connect(cfg.Driver, re.connectionString); err != nil {
 		log.Println("Cannot Connect to DB: ", err.Error())
 		return nil, err
 	}
@@ -53,6 +54,10 @@ func New(cfg *DbConfig) (*Engine, error) {
 	re.options.tbFormat = "snake"
 	log.Println("Successful Connect to DB")
 	return re, nil
+}
+
+func (re *Engine) GetConnectionString() string {
+	return re.connectionString
 }
 
 func generateConnectionString(cfg *DbConfig) (connectionString string, err error) {
@@ -110,7 +115,7 @@ func (re *Engine) extractTableName(data interface{}) reflect.Value {
 
 	sdValue := dValue
 	if dValue.Kind() == reflect.Slice {
-		re.Operations.isMultiRows = true
+		re.isMultiRows = true
 		re.multiPreparedValue = nil
 		for i := 0; i < dValue.Len(); i++ {
 			sdValue = dValue.Index(i)
@@ -135,7 +140,6 @@ func (re *Engine) extractTableName(data interface{}) reflect.Value {
 	case reflect.Slice:
 		sdType := dValue.Type()
 		strName := sdType.String()
-		log.Println(strName)
 		tblName = strName[strings.Index(strName, ".")+1:]
 	default:
 		tblName = sdValue.Type().Name()

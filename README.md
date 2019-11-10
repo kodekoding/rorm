@@ -1,91 +1,97 @@
 **Table Of Contents**
-- [RORM (Raw Query ORM) Description](#rorm-raw-query-orm-description)
-- [Benchmarking vs XORM](#benchmarking-vs-xorm)
-- [Support Database](#support-database)
-- [Installation](#installation)
-- [Features](#features)
-- [How To Use](#how-to-use)
-  - [Configure the Host](#configure-the-host)
-  - [Init New Engine](#init-new-engine)
-  - [Init the models](#init-the-models)
-  - [Create New SQL Select Query](#create-new-sql-select-query)
-    - [Get All Data](#get-all-data)
-      - [With SQL Raw](#with-sql-raw)
-      - [WITH Query Builder](#with-query-builder)
-    - [Get Multiple Result Data with Where Condition](#get-multiple-result-data-with-where-condition)
-    - [Get Single Result Data with Where Condition](#get-single-result-data-with-where-condition)
-  - [Create, Update, Delete Query](#create-update-delete-query)
-    - [Insert](#insert)
-      - [Single Insert](#single-insert)
-      - [Multiple Insert](#multiple-insert)
-    - [Update](#update)
-    - [Delete](#delete)
+- [RORM (Raw Query ORM) Description](#RORM-Raw-Query-ORM-Description)
+- [Benchmarking vs other ORM](#Benchmarking-vs-other-ORM)
+- [Support Database](#Support-Database)
+- [Installation](#Installation)
+- [Features (will be completed soon)](#Features-will-be-completed-soon)
+- [How To Use](#How-To-Use)
+  - [Configure the Host](#Configure-the-Host)
+  - [Init New Engine](#Init-New-Engine)
+  - [Init the models](#Init-the-models)
+  - [Create New SQL Select Query](#Create-New-SQL-Select-Query)
+    - [Get All Data](#Get-All-Data)
+      - [With SQL Raw](#With-SQL-Raw)
+      - [WITH Query Builder](#WITH-Query-Builder)
+    - [Get Multiple Result Data with Where Condition](#Get-Multiple-Result-Data-with-Where-Condition)
+    - [Get Single Result Data with Where Condition](#Get-Single-Result-Data-with-Where-Condition)
+  - [Create, Update, Delete Query](#Create-Update-Delete-Query)
+    - [Insert](#Insert)
+      - [Single Insert](#Single-Insert)
+      - [Multiple Insert](#Multiple-Insert)
+    - [Update](#Update)
+    - [Delete](#Delete)
 # RORM (Raw Query ORM) Description
 Raw Query ORM is a Query Builder as light as raw query and as easy as ORM
 
-# Benchmarking vs XORM
+# Benchmarking vs other ORM
+
+Environment: 
+  - MySQL 5.7
+  - MacBook Pro (mid 2017)
+  - Intel Core i7-7567U @ 3.5 GHz
+  - 16GB 2133 MHz LPDDR3
+
 source : https://github.com/kihamo/orm-benchmark
 
-command : ``` orm-benchmark -orm=xorm,rorm (-multi=1 default) ```
+command : ``` orm-benchmark -orm=all (-multi=1 default) ```
 
-```bash
+```go
 Reports: 
 
   2000 times - Insert
-       raw:     3.32s      1660658 ns/op     568 B/op     14 allocs/op
-      xorm:     5.38s      2688668 ns/op    2585 B/op     69 allocs/op
-      rorm:     5.58s      2787619 ns/op    1052 B/op     14 allocs/op
+       raw:     3.00s      1497568 ns/op     552 B/op     12 allocs/op
+ ---  rorm:     3.18s      1588970 ns/op     472 B/op      6 allocs/op ---
+       qbs:     3.56s      1780562 ns/op    4304 B/op    104 allocs/op
+       orm:     3.60s      1801961 ns/op    1427 B/op     36 allocs/op
+      modl:     4.41s      2206199 ns/op    1317 B/op     28 allocs/op
+      hood:     4.66s      2330843 ns/op   10738 B/op    155 allocs/op
+      gorp:     4.76s      2381558 ns/op    1390 B/op     29 allocs/op
+      xorm:     5.40s      2699078 ns/op    2562 B/op     66 allocs/op
+      gorm:     7.97s      3985524 ns/op    7695 B/op    148 allocs/op
 
    500 times - MultiInsert 100 row
-       raw:     2.48s      4961667 ns/op  110997 B/op   1110 allocs/op
-      xorm:     2.79s      5578304 ns/op  230925 B/op   4964 allocs/op
-      rorm:    90.84s    181683062 ns/op   53478 B/op    709 allocs/op
+---   rorm:     1.51s      3018679 ns/op   41888 B/op    105 allocs/op ---
+       orm:     1.52s      3037726 ns/op  103987 B/op   1529 allocs/op
+       raw:     2.41s      4823872 ns/op  108566 B/op    810 allocs/op
+      xorm:     2.74s      5483371 ns/op  228503 B/op   4663 allocs/op
+      gorp:     Not support multi insert
+      hood:     Not support multi insert
+      modl:     Not support multi insert
+      gorm:     Not support multi insert
+       qbs:     Not support multi insert
 
   2000 times - Update
-       raw:     1.66s       830352 ns/op     632 B/op     16 allocs/op
-      xorm:     3.29s      1642816 ns/op    2914 B/op    108 allocs/op
-      rorm:     3.40s      1700092 ns/op   13935 B/op    188 allocs/op
+---   rorm:     1.40s       700864 ns/op     288 B/op      5 allocs/op ---
+       raw:     1.47s       734044 ns/op     616 B/op     14 allocs/op
+       orm:     1.67s       836207 ns/op    1384 B/op     37 allocs/op
+      xorm:     2.81s      1405482 ns/op    2665 B/op    100 allocs/op
+      modl:     3.23s      1613397 ns/op    1489 B/op     36 allocs/op
+       qbs:     3.27s      1637255 ns/op    4298 B/op    104 allocs/op
+      gorp:     3.54s      1770792 ns/op    1536 B/op     35 allocs/op
+      hood:     4.89s      2443941 ns/op   10733 B/op    155 allocs/op
+      gorm:     8.99s      4494195 ns/op   18612 B/op    383 allocs/op
 
-  4000 times - Read
-      rorm:     3.35s       837601 ns/op    6213 B/op     85 allocs/op
-       raw:     3.37s       841311 ns/op    1432 B/op     37 allocs/op
-      xorm:     7.08s      1770239 ns/op    9762 B/op    268 allocs/op
+  4000 times - Read (will be fixed asap)
+       qbs:     2.89s       721410 ns/op    6358 B/op    176 allocs/op
+       raw:     3.16s       789744 ns/op    1432 B/op     37 allocs/op
+       orm:     3.48s       871127 ns/op    2610 B/op     93 allocs/op
+      hood:     5.80s      1450978 ns/op    4020 B/op     48 allocs/op
+---   rorm:     5.96s      1489016 ns/op    1792 B/op     40 allocs/op ---
+      gorm:     6.27s      1566251 ns/op   12153 B/op    239 allocs/op
+      modl:     6.36s      1591131 ns/op    1873 B/op     45 allocs/op
+      xorm:     6.66s      1664184 ns/op    9354 B/op    260 allocs/op
+      gorp:     6.76s      1690332 ns/op    1872 B/op     52 allocs/op
 
-  2000 times - MultiRead limit 100
-       raw:     2.65s      1326544 ns/op   34720 B/op   1320 allocs/op
-      rorm:     4.28s      2139107 ns/op   48668 B/op   1622 allocs/op
-      xorm:     5.85s      2926974 ns/op  178591 B/op   7892 allocs/op
-```
-
-command: ``` orm-benchmark -orm=xorm,rorm,raw -multi=10 ```
-
-```
-Reports: 
-
- 20000 times - Insert
-       raw:    25.43s      1271440 ns/op     568 B/op     14 allocs/op
-      rorm:    37.36s      1867861 ns/op    1027 B/op     14 allocs/op
-      xorm:    39.14s      1956955 ns/op    2578 B/op     69 allocs/op
-
-  5000 times - MultiInsert 100 row
-       raw:    20.76s      4151136 ns/op  110910 B/op   1110 allocs/op
-      xorm:    23.63s      4726541 ns/op  230813 B/op   4964 allocs/op
-      rorm:    725.63s    145125198 ns/op   53322 B/op    707 allocs/op
-
- 20000 times - Update
-       raw:    11.96s       598057 ns/op     632 B/op     16 allocs/op
-      xorm:    23.55s      1177686 ns/op    2914 B/op    108 allocs/op
-      rorm:    33.16s      1658050 ns/op   13901 B/op    188 allocs/op
-
- 40000 times - Read
-       raw:    23.60s       589875 ns/op    1432 B/op     37 allocs/op
-      rorm:    32.00s       799907 ns/op    6188 B/op     85 allocs/op
-      xorm:    53.26s      1331431 ns/op    9762 B/op    268 allocs/op
-
- 20000 times - MultiRead limit 100
-       raw:    17.87s       893332 ns/op   34720 B/op   1320 allocs/op
-      rorm:    41.47s      2073701 ns/op   48612 B/op   1622 allocs/op
-      xorm:    49.59s      2479707 ns/op  178586 B/op   7892 allocs/op
+  2000 times - MultiRead limit 100 (will be fixed asap)
+       raw:     2.28s      1139187 ns/op   34704 B/op   1320 allocs/op
+      modl:     2.32s      1159111 ns/op   49864 B/op   1721 allocs/op
+       orm:     2.38s      1191493 ns/op   85020 B/op   4283 allocs/op
+      gorp:     2.49s      1243186 ns/op   63685 B/op   1909 allocs/op
+---   rorm:     3.75s      1875212 ns/op   40441 B/op   1536 allocs/op ---
+       qbs:     3.75s      1875799 ns/op  165634 B/op   6428 allocs/op
+      hood:     4.32s      2158469 ns/op  136081 B/op   6358 allocs/op
+      xorm:     5.37s      2685240 ns/op  180061 B/op   8091 allocs/op
+      gorm:     5.44s      2721136 ns/op  254686 B/op   6226 allocs/op
 ```
 # Support Database
 | No   | Database   |
@@ -104,7 +110,7 @@ import to your project
 ```go
 import "github.com/radityaapratamaa/rorm"
 ```
-# Features
+# Features (will be completed soon)
 | Feature       | Using                                               | Description                                                                                                      |
 | :------------ | :-------------------------------------------------- | :--------------------------------------------------------------------------------------------------------------- |
 | Select        | Select(cols ...string)                              | Specify the column will be query                                                                                 |
@@ -180,9 +186,9 @@ log.Println("Success Connect to Database")
     // Init the models (struct name MUST BE SAME with table name)
     type Student struct {
         // db tag, filled based on column name
-        Id int `db:"id"`
-        Name string 
-        Address string
+        Id int `db:"id" sql:"pk"` //identify as PK column
+        Name string `db:"name"`
+        Address string `db:"address"`
         // IsActive is boolean field
         IsActive bool `db:"is_active"`
         // BirthDate is "Date" data type column field

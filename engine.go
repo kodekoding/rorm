@@ -209,6 +209,9 @@ func (re *Engine) clearField() {
 	re.counter = 0
 	re.bulkCounter = 0
 	re.updatedCol = nil
+	if re.stmt != nil {
+		re.stmt.Close()
+	}
 }
 
 func (re *Engine) StartBulkOptimized() {

@@ -1,6 +1,9 @@
 package rorm
 
-import "database/sql"
+import (
+	"context"
+	"database/sql"
+)
 
 // RormEngine - Engine of Raw Query ORM Library
 type (
@@ -10,10 +13,11 @@ type (
 		SetDB(db *sql.DB)
 		GetDB() *sql.DB
 		GetPreparedValues() []interface{}
+		GetMultiPreparedValues() [][]interface{}
 
-		StartBulkOptimized()
-		StopBulkOptimized()
-
+		PrepareData(ctx context.Context, command string, data interface{}) error
+		ExecuteCUDQuery(ctx context.Context, preparedValue ...interface{}) (int64, error)
+		Clear()
 		GenerateRawCUDQuery(command string, data interface{})
 
 		GetLastQuery() string

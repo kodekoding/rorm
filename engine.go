@@ -25,6 +25,12 @@ func (re *Engine) GetDB() *sqlx.DB {
 func (re *Engine) GetPreparedValues() []interface{} {
 	return re.preparedValue
 }
+func (re *Engine) GetMultiPreparedValues() [][]interface{} {
+	return re.multiPreparedValue
+}
+func (re *Engine) Clear() {
+	re.clearField()
+}
 
 // // New - init new RORM Engine
 // func New(dbDriver, connectionURL string, tbPrefix ...string) *Engine {

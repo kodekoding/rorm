@@ -38,6 +38,7 @@ type (
 	operations struct {
 		isRaw              bool
 		syntaxQuote        string
+		stmt               *sqlx.Stmt
 		isBulk             bool
 		isMultiRows        bool
 		bulkOptimized      bool

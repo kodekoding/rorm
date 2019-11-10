@@ -6,6 +6,7 @@ import (
 	"log"
 	"reflect"
 	"strings"
+	"time"
 
 	"github.com/radityaapratamaa/rorm/constants"
 	"github.com/radityaapratamaa/rorm/lib"
@@ -13,22 +14,75 @@ import (
 
 func (re *Engine) Insert(data interface{}) error {
 	defer re.clearField()
-	dVal := reflect.ValueOf(data)
 
-	if err := lib.CheckDataKind(dVal, true); err != nil {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	if err := re.PrepareData(ctx, "INSERT", data); err != nil {
 		return err
 	}
-	command := "INSERT"
+	defer re.stmt.Close()
+	if re.isBulk {
+		for _, pv := range re.multiPreparedValue {
+			if _, err := re.ExecuteCUDQuery(ctx, pv...); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	if _, err := re.ExecuteCUDQuery(ctx, re.preparedValue...); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (re *Engine) Update(data interface{}) error {
+	defer re.clearField()
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	if err := re.PrepareData(ctx, "UPDATE", data); err != nil {
+		return err
+	}
+	defer re.stmt.Close()
+	dt := re.preparedValue
+	_, err := re.ExecuteCUDQuery(ctx, dt...)
+	return err
+}
+
+func (re *Engine) Delete(data interface{}) error {
+	defer re.clearField()
+	dVal := reflect.ValueOf(data)
+	if err := lib.CheckDataKind(dVal, false); err != nil {
+		return err
+	}
+	command := "DELETE"
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	re.GenerateRawCUDQuery(command, data)
+	dt := re.preparedValue
+	_, err := re.ExecuteCUDQuery(ctx, dt...)
+	return err
+}
+
+func (re *Engine) PrepareData(ctx context.Context, command string, data interface{}) error {
+	var err error
+	dVal := reflect.ValueOf(data)
+	isInsert := false
+	if command == "INSERT" {
+		isInsert = true
+	}
+	if err := lib.CheckDataKind(dVal, isInsert); err != nil {
+		return err
+	}
 	if dVal.Elem().Kind() == reflect.Slice {
 		re.isBulk = true
 	}
-	// set column and preparedValue for executing data
-	if re.bulkCounter == 0 {
-		re.preparedData(command, data)
-		re.GenerateRawCUDQuery(command, data)
+	re.preparedData(command, data)
+	re.GenerateRawCUDQuery(command, data)
+	re.stmt, err = re.db.PreparexContext(ctx, re.rawQuery)
+	if err != nil {
+		return errors.New(constants.ErrPrepareStatement + err.Error())
 	}
-	_, err := re.executeCUDQuery(command)
-	return err
+	return nil
 }
 
 func (re *Engine) BindUpdateCol(col string, otherCols ...string) *Engine {
@@ -40,34 +94,6 @@ func (re *Engine) BindUpdateCol(col string, otherCols ...string) *Engine {
 		}
 	}
 	return re
-}
-
-func (re *Engine) Update(data interface{}) error {
-	defer re.clearField()
-	dVal := reflect.ValueOf(data)
-	if err := lib.CheckDataKind(dVal, false); err != nil {
-		return err
-	}
-
-	command := "UPDATE"
-	re.preparedData(command, data)
-	re.GenerateRawCUDQuery(command, data)
-	re.multiPreparedValue = nil
-	re.multiPreparedValue = append(re.multiPreparedValue, re.preparedValue)
-	_, err := re.executeCUDQuery(command)
-	return err
-}
-
-func (re *Engine) Delete(data interface{}) error {
-	defer re.clearField()
-	dVal := reflect.ValueOf(data)
-	if err := lib.CheckDataKind(dVal, false); err != nil {
-		return err
-	}
-	command := "DELETE"
-	re.GenerateRawCUDQuery(command, data)
-	_, err := re.executeCUDQuery(command)
-	return err
 }
 
 func (re *Engine) preparedData(command string, data interface{}) {
@@ -138,23 +164,13 @@ func (re *Engine) GenerateRawCUDQuery(command string, data interface{}) {
 	re.rawQuery = re.db.Rebind(re.rawQuery)
 }
 
-func (re *Engine) executeCUDQuery(cmd string) (int64, error) {
-	// ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	// defer cancel()
-	ctx := context.Background()
-	prepared, err := re.db.PreparexContext(ctx, re.rawQuery)
-	if err != nil {
-		return 0, errors.New(constants.ErrPrepareStatement + err.Error())
-	}
-	defer prepared.Close()
-
+func (re *Engine) ExecuteCUDQuery(ctx context.Context, preparedValue ...interface{}) (int64, error) {
 	var affectedRows int64
-	for _, pv := range re.multiPreparedValue {
-		if _, err = prepared.ExecContext(ctx, pv...); err != nil {
-			log.Println(err)
-			return int64(0), err
-		}
-		affectedRows++
+	// for _, pv := range re.multiPreparedValue {
+	if _, err := re.stmt.ExecContext(ctx, preparedValue...); err != nil {
+		log.Println(err)
+		return int64(0), err
 	}
+	affectedRows++
 	return affectedRows, nil
 }

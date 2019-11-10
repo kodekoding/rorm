@@ -25,6 +25,14 @@ func GetStructName(pointerStruct interface{}) (string, error) {
 	return CamelToSnakeCase(structName), nil
 }
 
+func IssetSliceKey(arr interface{}, index int) bool {
+	s := reflect.ValueOf(arr)
+	if reflect.TypeOf(arr).Kind() != reflect.Slice {
+		return false
+	}
+	return (s.Len() > index)
+}
+
 // CheckDataKind - Check data parameter when Create Update Delete Query
 func CheckDataKind(data reflect.Value, isInsert bool) error {
 	if data.Kind() != reflect.Ptr {

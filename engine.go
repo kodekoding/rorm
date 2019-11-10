@@ -52,7 +52,10 @@ func New(cfg *DbConfig) (*Engine, error) {
 	}
 	// set default for table case format
 	re.options.tbFormat = "snake"
-	log.Println("Successful Connect to DB")
+	re.syntaxQuote = "`"
+	if cfg.Driver != "mysql" {
+		re.syntaxQuote = "\""
+	}
 	return re, nil
 }
 
@@ -127,7 +130,19 @@ func (re *Engine) extractTableName(data interface{}) reflect.Value {
 				sdValue = sdValue.Elem()
 			}
 			for x := 0; x < sdValue.NumField(); x++ {
-				re.preparedValue = append(re.preparedValue, sdValue.Field(x).Interface())
+				fieldType := sdValue.Type().Field(x)
+				// nameFiled := fieldType.Name
+				tagField := fieldType.Tag
+				if re.updatedCol != nil {
+					if _, exist := re.updatedCol[tagField.Get("db")]; !exist {
+						continue
+					}
+				}
+				field := sdValue.Field(x)
+				if !re.checkStructTag(tagField, field) {
+					continue
+				}
+				re.preparedValue = append(re.preparedValue, field.Interface())
 			}
 			re.multiPreparedValue = append(re.multiPreparedValue, re.preparedValue)
 		}
@@ -149,6 +164,7 @@ func (re *Engine) extractTableName(data interface{}) reflect.Value {
 	} else {
 		re.tableName = lib.SnakeToCamelCase(tblName)
 	}
+	// re.tableName = re.syntaxQuote + re.tableName + re.syntaxQuote
 	return sdValue
 }
 
@@ -157,6 +173,19 @@ func (re *Engine) Connect(dbDriver, connectionURL string) error {
 	var err error
 	re.db, err = sqlx.Open(dbDriver, connectionURL)
 	return err
+}
+
+func (re *Engine) checkStructTag(tagField reflect.StructTag, fieldVal reflect.Value) bool {
+	sql := strings.Split(tagField.Get("sql"), ",")[0]
+	switch sql {
+	case "pk":
+		return false
+	case "date":
+		if fieldVal.String() == "" {
+			return false
+		}
+	}
+	return true
 }
 
 func (re *Engine) clearField() {
@@ -173,6 +202,7 @@ func (re *Engine) clearField() {
 	re.multiPreparedValue = nil
 	re.counter = 0
 	re.bulkCounter = 0
+	re.updatedCol = nil
 }
 
 func (re *Engine) StartBulkOptimized() {

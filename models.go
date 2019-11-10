@@ -37,10 +37,12 @@ type (
 	// Operations - list of property query string
 	operations struct {
 		isRaw              bool
+		syntaxQuote        string
 		isBulk             bool
 		isMultiRows        bool
 		bulkOptimized      bool
 		bulkCounter        int
+		updatedCol         map[string]bool
 		counter            int
 		rawQuery           string
 		column             string

@@ -309,7 +309,7 @@ func (re *Engine) generateSelectQuery() {
 			re.rawQuery += re.column
 		}
 		re.rawQuery += " FROM "
-		re.rawQuery += re.tableName
+		re.rawQuery += re.syntaxQuote + re.tableName + re.syntaxQuote
 
 		if re.condition != "" {
 			// Convert the Condition Value into the prepared Statement Condition
@@ -333,6 +333,7 @@ func (re *Engine) generateSelectQuery() {
 			re.rawQuery += re.limit
 		}
 	}
+	re.rawQuery = re.db.Rebind(re.rawQuery)
 }
 
 // Get - Execute the Raw Query and get Multi Rows Result
@@ -522,8 +523,6 @@ func (re *Engine) convertToPreparedCondition() {
 	listOfValues := regex.FindAllString(re.condition, -1)
 	// matches := regex.FindAllStringSubmatch(re.condition, -1)
 	re.condition = regex.ReplaceAllString(re.condition, "?")
-
-	re.condition = re.adjustPreparedParam(re.condition)
 
 	// re.preparedValue = nil
 	for _, val := range listOfValues {

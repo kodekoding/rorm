@@ -3,15 +3,16 @@ package rorm
 import (
 	"context"
 	"errors"
+	"log"
 	"reflect"
 	"strings"
-	"time"
 
 	"github.com/radityaapratamaa/rorm/constants"
 	"github.com/radityaapratamaa/rorm/lib"
 )
 
 func (re *Engine) Insert(data interface{}) error {
+	defer re.clearField()
 	dVal := reflect.ValueOf(data)
 
 	if err := lib.CheckDataKind(dVal, true); err != nil {
@@ -27,11 +28,22 @@ func (re *Engine) Insert(data interface{}) error {
 		re.GenerateRawCUDQuery(command, data)
 	}
 	_, err := re.executeCUDQuery(command)
-	re.bulkCounter++
 	return err
 }
 
+func (re *Engine) BindUpdateCol(col string, otherCols ...string) *Engine {
+	re.updatedCol = make(map[string]bool)
+	re.updatedCol[col] = true
+	if otherCols != nil {
+		for _, col := range otherCols {
+			re.updatedCol[col] = true
+		}
+	}
+	return re
+}
+
 func (re *Engine) Update(data interface{}) error {
+	defer re.clearField()
 	dVal := reflect.ValueOf(data)
 	if err := lib.CheckDataKind(dVal, false); err != nil {
 		return err
@@ -40,11 +52,14 @@ func (re *Engine) Update(data interface{}) error {
 	command := "UPDATE"
 	re.preparedData(command, data)
 	re.GenerateRawCUDQuery(command, data)
+	re.multiPreparedValue = nil
+	re.multiPreparedValue = append(re.multiPreparedValue, re.preparedValue)
 	_, err := re.executeCUDQuery(command)
 	return err
 }
 
 func (re *Engine) Delete(data interface{}) error {
+	defer re.clearField()
 	dVal := reflect.ValueOf(data)
 	if err := lib.CheckDataKind(dVal, false); err != nil {
 		return err
@@ -57,20 +72,29 @@ func (re *Engine) Delete(data interface{}) error {
 
 func (re *Engine) preparedData(command string, data interface{}) {
 	sdValue := re.extractTableName(data)
-	// re.preparedValue = nil
 	cols := "("
 	values := "("
 	if command == "UPDATE" {
 		values = ""
 	}
 	for x := 0; x < sdValue.NumField(); x++ {
-		tagField := sdValue.Type().Field(x).Tag
+		fieldType := sdValue.Type().Field(x)
+		tagField := fieldType.Tag
+		if re.updatedCol != nil {
+			if _, exist := re.updatedCol[tagField.Get("db")]; !exist {
+				continue
+			}
+		}
+		field := sdValue.Field(x)
+		if !re.checkStructTag(tagField, field) {
+			continue
+		}
 		col := strings.Split(tagField.Get("db"), ",")[0]
-		cols += col + ","
+		cols += re.syntaxQuote + col + re.syntaxQuote + ","
 		if command == "INSERT" {
 			values += "?,"
 		} else {
-			values += col + " = ?,"
+			values += re.syntaxQuote + col + re.syntaxQuote + " = ?,"
 		}
 		re.preparedValue = append(re.preparedValue, sdValue.Field(x).Interface())
 	}
@@ -105,21 +129,19 @@ func (re *Engine) GenerateRawCUDQuery(command string, data interface{}) {
 	}
 	re.rawQuery += " " + re.tableName + " " + re.column
 
-	re.rawQuery = re.adjustPreparedParam(re.rawQuery)
+	// re.rawQuery = re.adjustPreparedParam(re.rawQuery)
 	if re.condition != "" {
 		re.convertToPreparedCondition()
 		re.rawQuery += " WHERE "
 		re.rawQuery += re.condition
 	}
+	re.rawQuery = re.db.Rebind(re.rawQuery)
 }
 
 func (re *Engine) executeCUDQuery(cmd string) (int64, error) {
-	if !re.bulkOptimized {
-		defer re.clearField()
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-
+	// ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	// defer cancel()
+	ctx := context.Background()
 	prepared, err := re.db.PreparexContext(ctx, re.rawQuery)
 	if err != nil {
 		return 0, errors.New(constants.ErrPrepareStatement + err.Error())
@@ -129,6 +151,7 @@ func (re *Engine) executeCUDQuery(cmd string) (int64, error) {
 	var affectedRows int64
 	for _, pv := range re.multiPreparedValue {
 		if _, err = prepared.ExecContext(ctx, pv...); err != nil {
+			log.Println(err)
 			return int64(0), err
 		}
 		affectedRows++

@@ -19,6 +19,8 @@
       - [Single Insert](#Single-Insert)
       - [Multiple Insert](#Multiple-Insert)
     - [Update](#Update)
+      - [All Columns](#All-Columns)
+      - [Specific Column](#Specific-Column)
     - [Delete](#Delete)
 # RORM (Raw Query ORM) Description
 Raw Query ORM is a Query Builder as light as raw query and as easy as ORM
@@ -329,6 +331,7 @@ SELECT name, address, birth_date FROM student WHERE id = ?
 ```
 
 ### Update
+#### All Columns
 ```go
     dtStudent := Student{
         Name: "change",
@@ -352,6 +355,30 @@ SELECT name, address, birth_date FROM student WHERE id = ?
     -- prepared Values :
     -- ('change', 'change', 1, '2010-01-10', 1)
 ```
+#### Specific Column
+```go
+    dtStudent := Student{
+        Name: "change",
+        IsActive: 0,
+    }
+
+    // Add Function 'BindUpdateCol' and filled parameter with db column name lists
+    affected, err := db.Where("id", 1).BindUpdateCol("name", "is_active").Update(&dtStudent)
+    if err != nil {
+        log.Fatalln("Error When Update")
+    }
+
+    if affected > 0 {
+        log.Println("Success Update")
+    }
+```
+```sql
+    -- it will generate : (mysql)
+    UPDATE Student SET name = ?, is_active = ? WHERE id = ?
+    -- prepared Values :
+    -- ('change', 0, 1)
+```
+
 ### Delete
 ```go
     affected, err := db.Where("id", 1).Delete(&Student{})

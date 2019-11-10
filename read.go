@@ -297,8 +297,8 @@ func (re *Engine) Limit(limit int, offset ...int) *Engine {
 	return re
 }
 
-// return (*sql.Stmt, error)
-func (re *Engine) generateSelectQuery() {
+// GenerateSelectQuery - Generate Select Query
+func (re *Engine) GenerateSelectQuery() {
 
 	if !re.isRaw {
 		//===== Generated Query Start =====
@@ -352,13 +352,16 @@ func (re *Engine) Get(pointerStruct interface{}) error {
 	// }
 	re.extractTableName(pointerStruct)
 
-	re.generateSelectQuery()
+	re.GenerateSelectQuery()
+	prepareVal := re.preparedValue
+	return re.ExecuteSelectQuery(ctx, pointerStruct, prepareVal...)
+}
 
+func (re *Engine) ExecuteSelectQuery(ctx context.Context, pointerStruct interface{}, args ...interface{}) error {
 	if re.isMultiRows {
-		return re.db.SelectContext(ctx, pointerStruct, re.rawQuery, re.preparedValue...)
+		return re.db.SelectContext(ctx, pointerStruct, re.rawQuery, args...)
 	}
-	return re.db.GetContext(ctx, pointerStruct, re.rawQuery, re.preparedValue...)
-
+	return re.db.GetContext(ctx, pointerStruct, re.rawQuery, args...)
 }
 
 func (re *Engine) scanToStructv2(rows *sql.Rows, model interface{}) error {

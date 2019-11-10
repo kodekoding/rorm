@@ -5,11 +5,11 @@ import (
 	"database/sql"
 )
 
-// RormEngine - Engine of Raw Query ORM Library
 type (
+	// RormEngine - Engine of Raw Query ORM Library
 	RormEngine interface {
 		SetTableOptions(tbCaseFormat, tbPrefix string)
-
+		SetIsMultiRows(state bool)
 		SetDB(db *sql.DB)
 		GetDB() *sql.DB
 		GetPreparedValues() []interface{}
@@ -18,6 +18,7 @@ type (
 		PrepareData(ctx context.Context, command string, data interface{}) error
 		ExecuteCUDQuery(ctx context.Context, preparedValue ...interface{}) (int64, error)
 		Clear()
+		GenerateSelectQuery()
 		GenerateRawCUDQuery(command string, data interface{})
 
 		GetLastQuery() string

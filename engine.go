@@ -32,6 +32,10 @@ func (re *Engine) Clear() {
 	re.clearField()
 }
 
+func (re *Engine) SetIsMultiRows(state bool) {
+	re.isMultiRows = state
+}
+
 // // New - init new RORM Engine
 // func New(dbDriver, connectionURL string, tbPrefix ...string) *Engine {
 // 	re := &Engine{}

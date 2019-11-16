@@ -80,6 +80,10 @@ func (re *Engine) PrepareData(ctx context.Context, command string, data interfac
 }
 
 func (re *Engine) BindUpdateCol(col string, otherCols ...string) *Engine {
+	if strings.Contains(col, ",") {
+		log.Fatalln("col name parameter must not contains ','")
+		return nil
+	}
 	re.updatedCol = make(map[string]bool)
 	re.updatedCol[col] = true
 	if otherCols != nil {
@@ -106,44 +110,47 @@ func (re *Engine) PrepareMultiInsert(ctx context.Context, data interface{}) erro
 		tableName = lib.SnakeToCamelCase(tableName)
 	}
 	tableName = re.syntaxQuote + tableName + re.syntaxQuote
+	var cols strings.Builder
 
-	cols := "("
+	cols.Write([]byte("("))
 	val := cols
 	for x := 0; x < firstVal.NumField(); x++ {
-		fieldType := firstVal.Type().Field(x)
-		fieldValue := firstVal.Field(x)
-		if !re.checkStructTag(fieldType.Tag, fieldValue) {
+		colName, valid := re.getAndValidateTag(firstVal, x)
+		if !valid {
 			continue
 		}
-		dbTag := fieldType.Tag.Get("db")
-		colName := ""
-		if dbTag != "" {
-			dbTagArr := strings.Split(dbTag, ",")
-			colName = dbTagArr[0]
-			if lib.IssetSliceKey(dbTagArr, 1) && dbTagArr[1] == "sql" && fieldValue.String() == "" {
-				continue
-			}
-		} else {
-			colName = fieldType.Name
+		fieldValue := firstVal.Field(x)
+		cols.Write([]byte(re.syntaxQuote))
+		cols.Write([]byte(colName))
+		cols.Write([]byte(re.syntaxQuote))
+		val.Write([]byte("?"))
+		if x < firstVal.NumField()-1 {
+			cols.Write([]byte(","))
+			val.Write([]byte(","))
 		}
-		cols += re.syntaxQuote + colName + re.syntaxQuote + ","
-		val += "?,"
 
 		re.preparedValue = append(re.preparedValue, fieldValue.Interface())
 	}
-	cols = cols[:len(cols)-1]
-	val = val[:len(val)-1]
-	cols += ")"
-	val += ")"
-	re.column = cols + " VALUES " + strings.Repeat(val+",", sdValue.Len()-1) + val
-	re.rawQuery = "INSERT INTO " + tableName + " " + re.column
-	re.rawQuery = re.db.Rebind(re.rawQuery)
+	cols.Write([]byte(")"))
+	val.Write([]byte(")"))
+
+	re.writeColumn(cols.String())
+	re.writeColumn(" VALUES ")
+	re.writeColumn(strings.Repeat(val.String()+",", sdValue.Len()-1))
+	re.writeColumn(val.String())
+
+	re.writeQuery("INSERT INTO ")
+	re.writeQuery(tableName)
+	re.writeQuery(" ")
+	re.writeQuery(re.columnBuilder.String())
+	// re.rawQuery = "INSERT INTO " + tableName + " " + re.column
+	re.rawQuery = re.db.Rebind(re.rawQueryBuilder.String())
 	for x := 1; x < sdValue.Len(); x++ {
 		tmpVal := sdValue.Index(x).Elem()
 		for z := 0; z < tmpVal.NumField(); z++ {
 			fieldType := tmpVal.Type().Field(z)
 			fieldValue := tmpVal.Field(z)
-			if !re.checkStructTag(fieldType.Tag, fieldValue) {
+			if _, valid := re.checkStructTag(fieldType.Tag, fieldValue); !valid {
 				continue
 			}
 			re.preparedValue = append(re.preparedValue, tmpVal.Field(z).Interface())
@@ -151,58 +158,88 @@ func (re *Engine) PrepareMultiInsert(ctx context.Context, data interface{}) erro
 	}
 
 	var err error
-	re.stmt, err = re.db.PreparexContext(ctx, re.rawQuery)
+	re.stmt, err = re.db.PreparexContext(ctx, re.rawQueryBuilder.String())
 	if err != nil {
 		return errors.New(constants.ErrPrepareStatement + err.Error())
 	}
 	return nil
 }
 
+func (re *Engine) getAndValidateTag(field reflect.Value, keyIndex int) (string, bool) {
+	fieldType := field.Type().Field(keyIndex)
+	fieldValue := field.Field(keyIndex)
+	colNameTag := ""
+	var valid bool
+	if colNameTag, valid = re.checkStructTag(fieldType.Tag, fieldValue); !valid {
+
+		return "", false
+	}
+	if colNameTag != "" {
+		colNameTag = fieldType.Name
+	}
+	return colNameTag, true
+}
+
 func (re *Engine) preparedData(command string, data interface{}) {
 	sdValue := re.extractTableName(data)
-	cols := "("
-	values := "("
+
+	cols := strings.Builder{}
+	cols.Write([]byte("("))
+	values := cols
 	if command == "UPDATE" {
-		values = ""
+		values = strings.Builder{}
 	}
+	var valid bool
 	for x := 0; x < sdValue.NumField(); x++ {
-		fieldType := sdValue.Type().Field(x)
-		tagField := fieldType.Tag
+		col := ""
+		if col, valid = re.getAndValidateTag(sdValue, x); !valid {
+			continue
+		}
 		if re.updatedCol != nil {
-			if _, exist := re.updatedCol[tagField.Get("db")]; !exist {
+			if _, exist := re.updatedCol[col]; !exist {
 				continue
 			}
 		}
-		field := sdValue.Field(x)
-		if !re.checkStructTag(tagField, field) {
-			continue
-		}
-		col := strings.Split(tagField.Get("db"), ",")[0]
-		cols += re.syntaxQuote + col + re.syntaxQuote + ","
+		cols.Write([]byte(re.syntaxQuote))
+		cols.Write([]byte(col))
+		cols.Write([]byte(re.syntaxQuote))
+		cols.Write([]byte(","))
 		if command == "INSERT" {
-			values += "?,"
+			values.Write([]byte("?"))
 		} else {
-			values += re.syntaxQuote + col + re.syntaxQuote + " = ?,"
+			values.Write([]byte(re.syntaxQuote))
+			values.Write([]byte(col))
+			values.Write([]byte(re.syntaxQuote))
+			values.Write([]byte(" = ?"))
 		}
 		re.preparedValue = append(re.preparedValue, sdValue.Field(x).Interface())
+		if x < sdValue.NumField()-1 {
+			cols.Write([]byte(","))
+			values.Write([]byte(","))
+		}
 	}
 	re.multiPreparedValue = append(re.multiPreparedValue, re.preparedValue)
+	cols.Write([]byte(")"))
 
-	cols = cols[:len(cols)-1]
-	values = values[:len(values)-1]
-	cols += ")"
+	re.columnBuilder = strings.Builder{}
 	if command == "INSERT" {
-		values += ")"
-		re.column = cols + " VALUES " + values
+		values.Write([]byte(")"))
+		re.writeColumn(cols.String())
+		re.writeColumn(" VALUES ")
 	} else if command == "UPDATE" {
-		re.column = " SET " + values
+		re.writeColumn(" SET ")
 	}
+	re.writeColumn(values.String())
 }
 
 func (re *Engine) GenerateRawCUDQuery(command string, data interface{}) {
-	re.rawQuery = command
+	re.rawQueryBuilder = strings.Builder{}
+	re.writeQuery(command)
 
-	re.tableName = re.options.tbPrefix + re.tableName + re.options.tbPostfix
+	tbName := strings.Builder{}
+	tbName.Write([]byte(re.options.tbPrefix))
+	tbName.Write([]byte(re.tableName))
+	tbName.Write([]byte(re.options.tbPostfix))
 	// Adjustment Table Name to Case Format (if available)
 	switch re.options.tbFormat {
 	case "camel":
@@ -211,19 +248,23 @@ func (re *Engine) GenerateRawCUDQuery(command string, data interface{}) {
 		re.tableName = lib.CamelToSnakeCase(re.tableName)
 	}
 	if command == "INSERT" {
-		re.rawQuery += " INTO "
+		re.writeQuery(" INTO ")
 	} else if command == "DELETE" {
-		re.rawQuery += " FROM "
+		re.writeQuery(" FROM ")
 	}
-	re.rawQuery += " " + re.tableName + " " + re.column
+
+	re.writeQuery(" ")
+	re.writeQuery(tbName.String())
+	re.writeQuery(" ")
+	re.writeQuery(re.columnBuilder.String())
 
 	// re.rawQuery = re.adjustPreparedParam(re.rawQuery)
 	if re.condition != "" {
 		re.convertToPreparedCondition()
-		re.rawQuery += " WHERE "
-		re.rawQuery += re.condition
+		re.writeQuery(" WHERE ")
+		re.writeQuery(re.condition)
 	}
-	re.rawQuery = re.db.Rebind(re.rawQuery)
+	re.rawQuery = re.db.Rebind(re.rawQueryBuilder.String())
 }
 
 func (re *Engine) ExecuteCUDQuery(ctx context.Context, preparedValue ...interface{}) (int64, error) {

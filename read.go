@@ -3,8 +3,6 @@ package rorm
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
-	"errors"
 	"log"
 	"reflect"
 	"regexp"
@@ -14,33 +12,26 @@ import (
 	"github.com/radityaapratamaa/rorm/lib"
 )
 
-func (re *Engine) GetResults() []map[string]string {
-	return re.results
-}
-
 func (re *Engine) GetLastQuery() string {
-	return re.rawQuery
-}
-
-func (re *Engine) GetSingleResult() map[string]string {
-	if re.results == nil {
-		return nil
-	}
-	return re.results[0]
+	return re.rawQueryBuilder.String()
 }
 
 func (re *Engine) Select(col ...string) *Engine {
-	re.column += strings.Join(col, ",")
+	re.writeColumn(strings.Join(col, ","))
 	return re
 }
 
 func (re *Engine) aggregateFuncSelect(command, col string, colAlias ...string) {
-	if re.column != "" {
-		re.column += ","
+	if re.columnBuilder.String() != "" {
+		re.writeColumn(",")
 	}
-	re.column += command + "(" + col + ")"
+	re.writeColumn(command)
+	re.writeColumn("(")
+	re.writeColumn(col)
+	re.writeColumn(")")
 	if colAlias != nil {
-		re.column += " AS " + colAlias[0]
+		re.writeColumn(" AS ")
+		re.writeColumn(colAlias[0])
 	}
 }
 
@@ -87,12 +78,15 @@ func (re *Engine) From(tableName string) *Engine {
 }
 
 func (re *Engine) Join(tabel, on string) *Engine {
-	re.join += " JOIN " + tabel + " ON " + on
+	re.writeJoin(" JOIN ")
+	re.writeJoin(tabel)
+	re.writeJoin(" ON ")
+	re.writeJoin(on)
 	return re
 }
 
 func (re *Engine) GroupBy(col ...string) *Engine {
-	re.groupBy += strings.Join(col, ",")
+	re.writeGroupBy(strings.Join(col, ","))
 	return re
 }
 
@@ -106,11 +100,13 @@ func (re *Engine) Where(col string, value interface{}, opt ...string) *Engine {
 }
 
 func (re *Engine) WhereRaw(args string, value ...interface{}) *Engine {
-	if re.condition != "" {
-		re.condition += " AND "
+	if re.conditionBuilder.String() != "" {
+		re.writeCondition(" AND ")
 	}
-	re.condition += args
-	re.preparedValue = append(re.preparedValue, value...)
+	re.writeCondition(args)
+	if value != nil {
+		re.preparedValue = append(re.preparedValue, value...)
+	}
 	return re
 }
 
@@ -157,46 +153,49 @@ func (re *Engine) generateBetweenValue(val1, val2 interface{}) string {
 	if ref1.Kind() != ref2.Kind() {
 		log.Fatalln("Between Values must have same datatype")
 	}
-	value := "'"
+	var valBuilder strings.Builder
+	valBuilder.Write([]byte("'"))
 	switch ref1.Kind() {
 	case reflect.Int:
-		value += strconv.FormatInt(ref1.Int(), 10)
+		valBuilder.Write([]byte(strconv.FormatInt(ref1.Int(), 10)))
+	// value += strconv.FormatInt(ref1.Int(), 10)
 	case reflect.String:
-		value += ref1.String()
+		valBuilder.Write([]byte(ref1.String()))
 	}
-	value += "' AND '"
+	valBuilder.Write([]byte(" AND "))
 	switch ref2.Kind() {
 	case reflect.Int:
-		value += strconv.FormatInt(ref2.Int(), 10)
+		valBuilder.Write([]byte(strconv.FormatInt(ref2.Int(), 10)))
 	case reflect.String:
-		value += ref2.String()
+		valBuilder.Write([]byte(ref2.String()))
 	}
-	value += "'"
-	return value
+	valBuilder.Write([]byte("'"))
+
+	return valBuilder.String()
 }
 
 func (re *Engine) generateInValue(listValues ...interface{}) string {
 	if listValues == nil {
 		log.Fatalf("Values cannot be nil")
 	}
-	value := "("
+	var valBuilder strings.Builder
+	valBuilder.Write([]byte("("))
 	// Convert all values to '....'
-	for _, val := range listValues {
+	for k, val := range listValues {
 		reflectValue := reflect.ValueOf(val)
-		value += "'"
+		valBuilder.Write([]byte("'"))
 		switch reflectValue.Kind() {
 		case reflect.Int:
-			value += strconv.FormatInt(reflectValue.Int(), 10)
+			valBuilder.Write([]byte(strconv.FormatInt(reflectValue.Int(), 10)))
 		case reflect.String:
-			value += reflectValue.String()
+			valBuilder.Write([]byte(reflectValue.String()))
 		}
-		value += "',"
+		if k < len(listValues)-1 {
+			valBuilder.Write([]byte("',"))
+		}
 	}
-
-	// delete last ",""
-	value = value[:len(value)-1]
-	value += ")"
-	return value
+	valBuilder.Write([]byte(")"))
+	return valBuilder.String()
 }
 
 func (re *Engine) OrIn(col string, listOfValues ...interface{}) *Engine {
@@ -219,14 +218,17 @@ func (re *Engine) OrLike(col, value string) *Engine {
 }
 
 func (re *Engine) generateCondition(col string, nValue interface{}, opt string, isAnd bool) {
-	if re.condition != "" {
+	if re.conditionBuilder.String() != "" {
 		if !isAnd {
-			re.condition += " OR "
+			re.writeCondition(" OR ")
 		} else {
-			re.condition += " AND "
+			re.writeCondition(" AND ")
 		}
 	}
-	re.condition += col + " " + opt + " "
+	re.writeCondition(col)
+	re.writeCondition(" ")
+	re.writeCondition(opt)
+	re.writeCondition(" ")
 	// fmt.Println("opt " + opt)
 	iValue := reflect.ValueOf(nValue)
 	value := ""
@@ -245,9 +247,11 @@ func (re *Engine) generateCondition(col string, nValue interface{}, opt string, 
 		log.Fatalln("Value is not defined")
 	}
 	if !strings.Contains(opt, "IN") {
-		re.condition += "'" + value + "'"
+		re.writeCondition("'")
+		re.writeCondition(value)
+		re.writeCondition("'")
 	} else {
-		re.condition += value
+		re.writeCondition(value)
 	}
 }
 
@@ -266,74 +270,73 @@ func (re *Engine) Having() {
 }
 
 func (re *Engine) OrderBy(col, value string) *Engine {
-	if re.orderBy != "" {
-		re.orderBy += ", "
+	if re.orderByBuilder.String() != "" {
+		re.writeOrderBy(", ")
 	}
-	re.orderBy += col + " " + value
+	re.writeOrderBy(col)
+	re.writeOrderBy(" ")
+	re.writeOrderBy(value)
 	return re
 }
 
 func (re *Engine) Asc(col string) *Engine {
-	if re.orderBy != "" {
-		re.orderBy += ", "
-	}
-	re.orderBy += col + " ASC"
+	re.OrderBy(col, "ASC")
 	return re
 }
 
 func (re *Engine) Desc(col string) *Engine {
-	if re.orderBy != "" {
-		re.orderBy += ", "
-	}
-	re.orderBy += col + " DESC"
+	re.OrderBy(col, "DESC")
 	return re
 }
 
 func (re *Engine) Limit(limit int, offset ...int) *Engine {
 	if offset != nil {
-		re.limit = strconv.Itoa(offset[0]) + ", "
+		re.writeLimit(strconv.Itoa(offset[0]))
+		re.writeLimit(", ")
 	}
-	re.limit += strconv.Itoa(limit)
+	re.writeLimit(strconv.Itoa(limit))
 	return re
 }
 
 // GenerateSelectQuery - Generate Select Query
 func (re *Engine) GenerateSelectQuery() {
-
+	re.rawQueryBuilder = strings.Builder{}
 	if !re.isRaw {
 		//===== Generated Query Start =====
-		re.rawQuery = "SELECT "
+		re.writeQuery("SELECT ")
 		if re.column == "" {
-			re.rawQuery += "*"
+			re.writeQuery("*")
 		} else {
-			re.rawQuery += re.column
+			re.writeQuery(re.columnBuilder.String())
 		}
-		re.rawQuery += " FROM "
-		re.rawQuery += re.syntaxQuote + re.tableName + re.syntaxQuote
+		re.writeQuery(" FROM ")
+		re.writeQuery(re.syntaxQuote)
+		re.writeQuery(re.tableName)
+		re.writeQuery(re.syntaxQuote)
 
-		if re.condition != "" {
+		if re.conditionBuilder.String() != "" {
 			// Convert the Condition Value into the prepared Statement Condition
 			re.convertToPreparedCondition()
-			re.rawQuery += " WHERE "
-			re.rawQuery += re.condition
+			re.writeQuery(" WHERE ")
+			re.writeQuery(re.conditionBuilder.String())
 		}
 
-		if re.groupBy != "" {
-			re.rawQuery += " GROUP BY "
-			re.rawQuery += re.groupBy
+		if re.groupByBuilder.String() != "" {
+			re.writeQuery(" GROUP BY ")
+			re.writeQuery(re.groupByBuilder.String())
 		}
 
-		if re.orderBy != "" {
-			re.rawQuery += " ORDER BY "
-			re.rawQuery += re.orderBy
+		if re.orderByBuilder.String() != "" {
+			re.writeQuery(" ORDER BY ")
+			re.writeQuery(re.orderByBuilder.String())
 		}
 
-		if re.limit != "" {
-			re.rawQuery += " LIMIT "
-			re.rawQuery += re.limit
+		if re.limitBuilder.String() != "" {
+			re.writeQuery(" LIMIT ")
+			re.writeQuery(re.limitBuilder.String())
 		}
 	}
-	re.rawQuery = re.db.Rebind(re.rawQuery)
+	re.rawQuery = re.db.Rebind(re.rawQueryBuilder.String())
 }
 
 // Get - Execute the Raw Query and get Multi Rows Result
@@ -372,151 +375,6 @@ func (re *Engine) scanToStructv2(rows *sql.Rows, model interface{}) error {
 	log.Printf("%#v -> %#v ", sliceElem, mType)
 	// sliceElem.
 	return nil
-}
-
-func (re *Engine) scanToStruct(rows *sql.Rows, model interface{}) error {
-	v := reflect.ValueOf(model)
-	if v.Kind() != reflect.Ptr {
-		return errors.New("must pass a pointer, not a value, to StructScan destination") // @todo add new error message
-	}
-
-	v = reflect.Indirect(v)
-	// t := v.Type()
-
-	cols, _ := rows.Columns()
-
-	rowCount := 0
-	multiRes := []map[string]interface{}{}
-	var singleRes = make(map[string]interface{})
-	// columns := make([]sql.RawBytes, len(cols))
-	columns := make([]interface{}, len(cols))
-	columnPointers := make([]interface{}, len(cols))
-	for i := range columns {
-		columnPointers[i] = &columns[i]
-	}
-	for rows.Next() {
-
-		if err := rows.Scan(columnPointers...); err != nil {
-			return err
-		}
-
-		singleRes = make(map[string]interface{})
-		for i, colName := range columns {
-			var value interface{}
-			value = colName
-			val := reflect.TypeOf(value)
-			switch val.Kind() {
-			case reflect.Int64, reflect.Int:
-				singleRes[cols[i]] = colName.(int64)
-			default:
-				singleRes[cols[i]] = string(colName.([]byte))
-			}
-		}
-		multiRes = append(multiRes, singleRes)
-		rowCount++
-	}
-
-	var willBeMarshall interface{}
-	willBeMarshall = multiRes
-	if len(multiRes) == 1 {
-		willBeMarshall = singleRes
-	} else if len(multiRes) == 0 {
-		model = nil
-		return nil
-	}
-	bJson, err := json.Marshal(willBeMarshall)
-	if err != nil {
-		return err
-	}
-	return json.Unmarshal(bJson, model)
-	// }
-	// for i := 0; i < v.NumField(); i++ {
-	// 	field := strings.Split(t.Field(i).Tag.Get("rorm"), ",")[0]
-
-	// 	if item, ok := m[field]; ok {
-	// 		if v.Field(i).CanSet() {
-	// 			if item != nil {
-	// 				switch v.Field(i).Kind() {
-	// 				case reflect.String:
-	// 					v.Field(i).SetString(string(item.([]uint8)))
-	// 				case reflect.Float32, reflect.Float64:
-	// 					v.Field(i).SetFloat(item.(float64))
-	// 				case reflect.Int64, reflect.Int:
-	// 					v.Field(i).SetInt(item.(int64))
-	// 				case reflect.Ptr:
-	// 					if reflect.ValueOf(item).Kind() == reflect.Bool {
-	// 						itemBool := item.(bool)
-	// 						v.Field(i).Set(reflect.ValueOf(&itemBool))
-	// 					}
-	// 				case reflect.Struct:
-	// 					v.Field(i).Set(reflect.ValueOf(item))
-	// 				default:
-	// 					fmt.Println(t.Field(i).Name, ": ", v.Field(i).Kind(), " - > - ", reflect.ValueOf(item).Kind()) // @todo remove after test out the Get methods
-	// 				}
-	// 			}
-	// 		}
-	// 	}
-	// }
-
-	// return nil
-}
-
-//GetRows parses recordset into map
-func (re *Engine) getRows(rows *sql.Rows, pointerResult interface{}) error {
-	var results []map[string]interface{}
-	re.results = nil
-
-	// Get column names
-	columns, err := rows.Columns()
-	if err != nil {
-		return err
-	}
-
-	// Make a slice for the values
-	values := make([]sql.RawBytes, len(columns))
-
-	// rows.Scan wants '[]interface{}' as an argument, so we must copy the
-	// references into such a slice
-	// See http://code.google.com/p/go-wiki/wiki/InterfaceSlice for details
-	scanArgs := make([]interface{}, len(values))
-	for i := range values {
-		scanArgs[i] = &values[i]
-	}
-
-	// Fetch rows
-	for rows.Next() {
-		// get RawBytes from data
-		err = rows.Scan(scanArgs...)
-		if err != nil {
-			return err
-		}
-		// initialize the second layer
-		contents := make(map[string]interface{})
-
-		// Now do something with the data.
-		// Here we just print each column as a string.
-		var value string
-		for i, col := range values {
-			// Here we can check if the value is nil (NULL value)
-			if col == nil {
-				value = "NULL"
-			} else {
-				value = string(col)
-			}
-			contents[columns[i]] = value
-		}
-		results = append(results, contents)
-	}
-	if err = rows.Err(); err != nil {
-		return err
-	}
-
-	bRes, err := json.Marshal(results)
-	if err != nil {
-		return err
-	}
-	return json.Unmarshal(bRes, &pointerResult)
-
 }
 
 func (re *Engine) convertToPreparedCondition() {

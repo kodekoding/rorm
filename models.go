@@ -1,6 +1,10 @@
 package rorm
 
-import "github.com/jmoiron/sqlx"
+import (
+	"strings"
+
+	"github.com/jmoiron/sqlx"
+)
 
 type (
 	// Engine - Raw Query ORM Engine structure
@@ -8,10 +12,9 @@ type (
 		db               *sqlx.DB
 		config           *DbConfig
 		options          *DbOptions
-		result           map[string]string
-		results          []map[string]string
 		connectionString string
 		operations
+		builderOperations
 	}
 
 	// DbConfig - DB Connection struct
@@ -35,6 +38,16 @@ type (
 		colFormat string //column format (camel case/snake case)
 	}
 	// Operations - list of property query string
+
+	builderOperations struct {
+		rawQueryBuilder  strings.Builder
+		conditionBuilder strings.Builder
+		columnBuilder    strings.Builder
+		orderByBuilder   strings.Builder
+		limitBuilder     strings.Builder
+		joinBuilder      strings.Builder
+		groupByBuilder   strings.Builder
+	}
 	operations struct {
 		isRaw              bool
 		syntaxQuote        string

@@ -140,18 +140,10 @@ func (re *Engine) extractTableName(data interface{}) reflect.Value {
 				sdValue = sdValue.Elem()
 			}
 			for x := 0; x < sdValue.NumField(); x++ {
-				fieldType := sdValue.Type().Field(x)
-				// nameFiled := fieldType.Name
-				tagField := fieldType.Tag
-				if re.updatedCol != nil {
-					if _, exist := re.updatedCol[tagField.Get("db")]; !exist {
-						continue
-					}
-				}
-				field := sdValue.Field(x)
-				if !re.checkStructTag(tagField, field) {
+				if _, valid := re.getAndValidateTag(sdValue, x); !valid {
 					continue
 				}
+				field := sdValue.Field(x)
 				re.preparedValue = append(re.preparedValue, field.Interface())
 			}
 			re.multiPreparedValue = append(re.multiPreparedValue, re.preparedValue)
@@ -185,26 +177,34 @@ func (re *Engine) Connect(dbDriver, connectionURL string) error {
 	return err
 }
 
-func (re *Engine) checkStructTag(tagField reflect.StructTag, fieldVal reflect.Value) bool {
-	sql := strings.Split(tagField.Get("sql"), ",")[0]
-	switch sql {
-	case "pk":
-		return false
-	case "date":
-		if fieldVal.String() == "" {
-			return false
-		}
+func (re *Engine) checkStructTag(tagField reflect.StructTag, fieldVal reflect.Value) (string, bool) {
+	if tagField.Get("rorm") == "" {
+		return "", false
 	}
-	return true
+	identifierTagArr := strings.Split(tagField.Get("rorm"), " ")
+	for _, val := range identifierTagArr {
+		switch val {
+		case "pk", "ai":
+			return "", false
+		case "date":
+			if fieldVal.String() == "" {
+				return "", false
+			}
+		}
+
+	}
+
+	return identifierTagArr[0], true
 }
 
 func (re *Engine) clearField() {
-	re.condition = ""
-	re.column = ""
-	re.orderBy = ""
+
+	re.conditionBuilder = strings.Builder{}
+	re.columnBuilder = strings.Builder{}
+	re.orderByBuilder = strings.Builder{}
 	re.tableName = ""
-	re.limit = ""
-	re.join = ""
+	re.limitBuilder = strings.Builder{}
+	re.joinBuilder = strings.Builder{}
 	re.isRaw = false
 	re.isBulk = false
 	re.isMultiRows = false
@@ -225,6 +225,10 @@ func (re *Engine) StartBulkOptimized() {
 func (re *Engine) StopBulkOptimized() {
 	re.bulkOptimized = false
 	re.clearField()
+}
+
+func (re *Engine) buildString() {
+
 }
 
 func (re *Engine) SetTableOptions(tbCaseFormat, tbPrefix string) {

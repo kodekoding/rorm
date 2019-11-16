@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/radityaapratamaa/rorm/constants"
-	"github.com/radityaapratamaa/rorm/lib"
+	"github.com/kodekoding/rorm/constants"
+	"github.com/kodekoding/rorm/lib"
 )
 
 func (re *Engine) Insert(data interface{}) error {

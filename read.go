@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/radityaapratamaa/rorm/lib"
+	"github.com/kodekoding/rorm/lib"
 )
 
 func (re *Engine) GetLastQuery() string {

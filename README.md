@@ -104,13 +104,13 @@ Reports:
 
 # Installation
 ```go
-go get github.com/radityaapratamaa/rorm
+go get github.com/kodekoding/rorm
 ```
 
 import to your project
 
 ```go
-import "github.com/radityaapratamaa/rorm"
+import "github.com/kodekoding/rorm"
 ```
 # Features (will be completed soon)
 | Feature       | Using                                               | Description                                                                                                      |

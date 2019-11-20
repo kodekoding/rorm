@@ -57,6 +57,7 @@ type (
 		bulkOptimized      bool
 		bulkCounter        int
 		updatedCol         map[string]bool
+		tmpStruct          interface{}
 		counter            int
 		rawQuery           string
 		column             string

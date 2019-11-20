@@ -2,7 +2,8 @@ package rorm
 
 import (
 	"context"
-	"database/sql"
+
+	"github.com/jmoiron/sqlx"
 )
 
 type (
@@ -10,15 +11,15 @@ type (
 	RormEngine interface {
 		SetTableOptions(tbCaseFormat, tbPrefix string)
 		SetIsMultiRows(state bool)
-		SetDB(db *sql.DB)
-		GetDB() *sql.DB
+		SetDB(db *sqlx.DB)
+		GetDB() *sqlx.DB
 		GetPreparedValues() []interface{}
 		GetMultiPreparedValues() [][]interface{}
 
 		PrepareData(ctx context.Context, command string, data interface{}) error
 		ExecuteCUDQuery(ctx context.Context, preparedValue ...interface{}) (int64, error)
 		Clear()
-		GenerateSelectQuery()
+		GenerateSelectQuery(ctx context.Context) error
 		GenerateRawCUDQuery(command string, data interface{})
 
 		GetLastQuery() string

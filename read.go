@@ -3,6 +3,8 @@ package rorm
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
+	"errors"
 	"log"
 	"reflect"
 	"regexp"
@@ -299,7 +301,7 @@ func (re *Engine) Limit(limit int, offset ...int) *Engine {
 }
 
 // GenerateSelectQuery - Generate Select Query
-func (re *Engine) GenerateSelectQuery() {
+func (re *Engine) GenerateSelectQuery(ctx context.Context) error {
 	re.rawQueryBuilder = strings.Builder{}
 	if !re.isRaw {
 		//===== Generated Query Start =====
@@ -337,6 +339,19 @@ func (re *Engine) GenerateSelectQuery() {
 		}
 	}
 	re.rawQuery = re.db.Rebind(re.rawQueryBuilder.String())
+	if err := re.prepareSelectQuery(ctx); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (re *Engine) prepareSelectQuery(ctx context.Context) error {
+	var err error
+	re.stmt, err = re.db.PreparexContext(ctx, re.rawQuery)
+	if err != nil {
+		return errors.New("Error When Prepared Query: " + err.Error())
+	}
+	return nil
 }
 
 // Get - Execute the Raw Query and get Multi Rows Result
@@ -355,16 +370,63 @@ func (re *Engine) Get(pointerStruct interface{}) error {
 	// }
 	re.extractTableName(pointerStruct)
 
-	re.GenerateSelectQuery()
+	re.GenerateSelectQuery(ctx)
 	prepareVal := re.preparedValue
 	return re.ExecuteSelectQuery(ctx, pointerStruct, prepareVal...)
 }
 
 func (re *Engine) ExecuteSelectQuery(ctx context.Context, pointerStruct interface{}, args ...interface{}) error {
-	if re.isMultiRows {
-		return re.db.SelectContext(ctx, pointerStruct, re.rawQuery, args...)
+	var byteResults []byte
+	var err error
+	// if re.isMultiRows {
+	rows, err := re.stmt.QueryxContext(ctx, re.preparedValue...)
+	if err != nil {
+		return errors.New("Error When Execute Prepared Statement: " + err.Error())
 	}
-	return re.db.GetContext(ctx, pointerStruct, re.rawQuery, args...)
+	cols, err := rows.Columns()
+	if err != nil {
+		return err
+	}
+
+	tmpScan := make([]interface{}, len(cols))
+	pointerTmp := make([]interface{}, len(cols))
+	for x := range tmpScan {
+		pointerTmp[x] = &tmpScan[x]
+	}
+	var multiRows []map[string]interface{}
+	var row map[string]interface{}
+	for rows.Next() {
+		if err = rows.Scan(pointerTmp...); err != nil {
+			return err
+		}
+
+		row = make(map[string]interface{})
+		for k, colVal := range tmpScan {
+			switch reflect.TypeOf(colVal).Kind() {
+			case reflect.Int64, reflect.Int:
+				row[cols[k]] = colVal.(int64)
+			default:
+				row[cols[k]] = string(colVal.([]byte))
+			}
+		}
+
+		multiRows = append(multiRows, row)
+	}
+
+	var willBeMarshall interface{}
+	willBeMarshall = multiRows
+	if !re.isMultiRows {
+		willBeMarshall = row
+	}
+	byteResults, err = json.Marshal(willBeMarshall)
+	if err != nil {
+		return errors.New("Error When Marshalling Result:" + err.Error())
+	}
+
+	if err := json.Unmarshal(byteResults, pointerStruct); err != nil {
+		return errors.New("Error When Convert to Struct:" + err.Error())
+	}
+	return nil
 }
 
 func (re *Engine) scanToStructv2(rows *sql.Rows, model interface{}) error {

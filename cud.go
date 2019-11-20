@@ -165,27 +165,13 @@ func (re *Engine) PrepareMultiInsert(ctx context.Context, data interface{}) erro
 	return nil
 }
 
-func (re *Engine) getAndValidateTag(field reflect.Value, keyIndex int) (string, bool) {
-	fieldType := field.Type().Field(keyIndex)
-	fieldValue := field.Field(keyIndex)
-	colNameTag := ""
-	var valid bool
-	if colNameTag, valid = re.checkStructTag(fieldType.Tag, fieldValue); !valid {
-
-		return "", false
-	}
-	if colNameTag != "" {
-		colNameTag = fieldType.Name
-	}
-	return colNameTag, true
-}
-
 func (re *Engine) preparedData(command string, data interface{}) {
 	sdValue := re.extractTableName(data)
 
 	cols := strings.Builder{}
+	values := strings.Builder{}
 	cols.Write([]byte("("))
-	values := cols
+	values = cols
 	if command == "UPDATE" {
 		values = strings.Builder{}
 	}

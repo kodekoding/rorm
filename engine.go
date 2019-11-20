@@ -156,10 +156,13 @@ func (re *Engine) extractTableName(data interface{}) reflect.Value {
 		tblName = sdValue.Type().Name()
 	case reflect.Slice:
 		sdType := dValue.Type()
+		re.tmpStruct = reflect.New(sdType.Elem()).Interface()
 		strName := sdType.String()
 		tblName = strName[strings.Index(strName, ".")+1:]
 	default:
-		tblName = sdValue.Type().Name()
+		sdType := sdValue.Type()
+		re.tmpStruct = reflect.New(sdType).Interface()
+		tblName = sdType.Name()
 	}
 	if re.options.tbFormat == "snake" {
 		re.tableName = lib.CamelToSnakeCase(tblName)
@@ -177,18 +180,35 @@ func (re *Engine) Connect(dbDriver, connectionURL string) error {
 	return err
 }
 
-func (re *Engine) checkStructTag(tagField reflect.StructTag, fieldVal reflect.Value) (string, bool) {
-	if tagField.Get("rorm") == "" {
+func (re *Engine) getAndValidateTag(field reflect.Value, keyIndex int) (string, bool) {
+	fieldType := field.Type().Field(keyIndex)
+	fieldValue := field.Field(keyIndex)
+	colNameTag := ""
+	var valid bool
+	if colNameTag, valid = re.checkStructTag(fieldType.Tag, fieldValue); !valid {
+
 		return "", false
 	}
+	if colNameTag != "" {
+		colNameTag = fieldType.Name
+	}
+	return colNameTag, true
+}
+
+func (re *Engine) checkStructTag(tagField reflect.StructTag, fieldVal reflect.Value) (string, bool) {
+	colName := ""
+	if tagField.Get("json") == "" {
+		return colName, false
+	}
+	colName = strings.Split(tagField.Get("json"), ",")[0]
 	identifierTagArr := strings.Split(tagField.Get("rorm"), " ")
 	for _, val := range identifierTagArr {
 		switch val {
 		case "pk", "ai":
-			return "", false
+			return colName, false
 		case "date":
 			if fieldVal.String() == "" {
-				return "", false
+				return colName, false
 			}
 		}
 
@@ -213,6 +233,7 @@ func (re *Engine) clearField() {
 	re.counter = 0
 	re.bulkCounter = 0
 	re.updatedCol = nil
+	re.tmpStruct = nil
 	if re.stmt != nil {
 		re.stmt.Close()
 	}

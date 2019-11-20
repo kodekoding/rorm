@@ -111,9 +111,10 @@ func (re *Engine) PrepareMultiInsert(ctx context.Context, data interface{}) erro
 	}
 	tableName = re.syntaxQuote + tableName + re.syntaxQuote
 	var cols strings.Builder
+	var val strings.Builder
 
 	cols.Write([]byte("("))
-	val := cols
+	val.Write([]byte("("))
 	for x := 0; x < firstVal.NumField(); x++ {
 		colName, valid := re.getAndValidateTag(firstVal, x)
 		if !valid {
@@ -171,11 +172,16 @@ func (re *Engine) preparedData(command string, data interface{}) {
 	cols := strings.Builder{}
 	values := strings.Builder{}
 	cols.Write([]byte("("))
-	values = cols
+	values.Write([]byte("("))
 	if command == "UPDATE" {
 		values = strings.Builder{}
 	}
 	var valid bool
+	totalField := sdValue.NumField()
+	if re.updatedCol != nil {
+		totalField = len(re.updatedCol)
+	}
+	z := -1
 	for x := 0; x < sdValue.NumField(); x++ {
 		col := ""
 		if col, valid = re.getAndValidateTag(sdValue, x); !valid {
@@ -186,10 +192,10 @@ func (re *Engine) preparedData(command string, data interface{}) {
 				continue
 			}
 		}
+		z++
 		cols.Write([]byte(re.syntaxQuote))
 		cols.Write([]byte(col))
 		cols.Write([]byte(re.syntaxQuote))
-		cols.Write([]byte(","))
 		if command == "INSERT" {
 			values.Write([]byte("?"))
 		} else {
@@ -199,7 +205,7 @@ func (re *Engine) preparedData(command string, data interface{}) {
 			values.Write([]byte(" = ?"))
 		}
 		re.preparedValue = append(re.preparedValue, sdValue.Field(x).Interface())
-		if x < sdValue.NumField()-1 {
+		if z < totalField-1 {
 			cols.Write([]byte(","))
 			values.Write([]byte(","))
 		}

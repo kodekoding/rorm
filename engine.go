@@ -189,7 +189,7 @@ func (re *Engine) getAndValidateTag(field reflect.Value, keyIndex int) (string, 
 
 		return "", false
 	}
-	if colNameTag != "" {
+	if colNameTag == "" {
 		colNameTag = fieldType.Name
 	}
 	return colNameTag, true
